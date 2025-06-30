@@ -30,6 +30,33 @@ def create_plot(data):
     ax.legend(handles, labels)
     return fig
 
+def find_bracketing_rows(df, column_name, target_value):
+    # Sort the DataFrame by the specified column
+    df_sorted = df.sort_values(by=column_name)
+    
+    # Initialize variables for bracketing
+    lower_row = None
+    upper_row = None
+
+    # Iterate through the sorted DataFrame to find bracketing rows
+    for index, row in df_sorted.iterrows():
+        value = row[column_name]
+        if value < target_value:
+            lower_row = row
+        elif value > target_value and upper_row is None:
+            upper_row = row
+            break
+
+    # If both lower and upper rows are found, create a new DataFrame
+    if lower_row is not None and upper_row is not None:
+        return pd.DataFrame([lower_row, upper_row])
+    else:
+        # If no bracketing rows found, find the two closest rows
+        df_sorted['distance'] = abs(df_sorted[column_name] - target_value)
+        closest_rows = df_sorted.nsmallest(2, 'distance')
+        closest_rows = closest_rows.drop(columns='distance')  # Drop the distance column if you don't want it
+        return closest_rows
+
 # Streamlit app layout
 st.title("BBR Data Processor (alpha release)")
 st.image("BBRtoDSR.jpeg")
@@ -133,8 +160,8 @@ if st.button("Print Results"):
     
     if len(allresults)>=2:
             
-            ddf1 = allresults.iloc[(allresults['m-value(60)']-0.3).abs().argsort()[:2]]
-            ddf2 = allresults.iloc[(allresults['S(60)']-300).abs().argsort()[:2]]
+            ddf1 = find_bracketing_rows(allresults,'m-value(60)',0.3)
+            ddf2 = find_bracketing_rows(allresults,'S(60)',300)
             slope1, intercept1, r_value1, p_value1, std_err1 = stats.linregress(ddf1['m-value(60)'], ddf1['Temperature (C)'])
             slope2, intercept2, r_value2, p_value2, std_err2 = stats.linregress(np.log(ddf2['S(60)']), ddf2['Temperature (C)'])
             T_s = round(-10+slope2*np.log(300)+intercept2,1)
