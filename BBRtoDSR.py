@@ -278,12 +278,13 @@ if st.button("Print Results"):
             ax4.set_xlabel('Temperature (°C)')
             ax4.set_ylabel('Shift Factor')
             ax4.set_yscale('log')
-            plt.figtext(0.50, 0.60, f'ln$a_{"T"}$ = ($E_{"a"}$/R)(1/T-1/$T_{{{"ref"}}}$)' )
+            plt.figtext(0.50, 0.60, f'ln$a_{"T"}$ = ($E_{"a"}$/R)(1/$T$-1/$T_{{{"ref"}}}$)' )
             handles4, labels4 = ax4.get_legend_handles_labels()
             ax4.legend(handles4, labels4)
             st.pyplot(fig4)
             
             st.write(f"**$E_{'a'}$: {round(slope4*np.log(10)*8.314462618/1000,3)} kJ/mol**")
+            st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 J⋅$K^{−1}$⋅$mol^{−1}$**")
             
             st.markdown("""---""")
             
