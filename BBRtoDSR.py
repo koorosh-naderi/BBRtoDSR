@@ -370,8 +370,8 @@ if st.button("Print Results"):
             G_R = (G_GR/(np.sin(np.radians(phase_GR))))*(np.cos(np.radians(phase_GR)))**2
 
             st.write(f"**G-R: {round(G_R,0)} kPa**")
-            st.write(f"**$Complex Modulus_{{{'G-R'}}}$: {round(G_GR,0)} kPa**")
-            st.write(f"**$Phase Angle_{{{'G-R'}}}$: {round(phase_GR,0)} °**")
+            st.write(f"**$G^{'*'}_{{{'G-R'}}}$: {round(G_GR,0)} kPa**")
+            st.write(f"**$δ_{{{'G-R'}}}$: {round(phase_GR,0)} °**")
 
             st.markdown("""---""")
 
