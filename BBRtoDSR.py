@@ -105,6 +105,12 @@ def ca_minimize(args):
     G_calc_CA = 1000*(1+(10**logOmegaC/reduced_omega)**beta)**(-1/beta)
     return sum((np.log10(G_calc_CA) - np.log10(dynamic_shear_modulus))**2)
 
+def T_fatigue_minimize(T):
+    omega_red_T_fatigue = 10*10**(slope4*(1/(T+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+    phase_fatigue = 90/(1+(omega_red_T_fatigue/(10**result_CA.x[1]))**result_CA.x[0])
+    G_fatigue = 1000*1000*(1+(10**result_CA.x[1]/omega_red_T_fatigue)**result_CA.x[0])**(-1/result_CA.x[0])
+    return (5000-G_fatigue*np.sin(np.radians(phase_fatigue)))**2
+
 # Streamlit app layout
 st.title("BBR Data Processor (alpha release)")
 st.image("BBRtoDSR.jpeg")
@@ -363,7 +369,12 @@ if st.button("Print Results"):
             
             G_R = (G_GR/(np.sin(np.radians(phase_GR))))*(np.cos(np.radians(phase_GR)))**2
 
-            st.write(f"**G-R: {round(G_R,0)} kPa**")                
+            st.write(f"**G-R: {round(G_R,0)} kPa**")
+
+            initial_data_T_fatigue = [22]
+            result_T_fatigue = minimize(T_fatigue_minimize, initial_data_T_fatigue)    
+            
+            st.write(f"**$T_{{{'Fatigue'}}}$: {round(result_T_fatigue.x[0],1)} °C**")
     
     
     
