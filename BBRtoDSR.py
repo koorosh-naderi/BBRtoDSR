@@ -135,6 +135,17 @@ st.sidebar.write("""
 st.sidebar.markdown("### Contact Me")
 st.sidebar.write("For more information, please reach out to me at: [koorosh.naderi@colas.com](mailto:koorosh.naderi@colas.com)")
 
+st.sidebar.markdown("""
+<style>
+.sidebar .sidebar-content {
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    padding: 10px;
+    width: 500px
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.image("BBRtoDSR.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
 st.write("A minimum of two CSV files is required for analysis.")
@@ -145,8 +156,6 @@ if 'uploaded_files' not in st.session_state:
 
 # File uploader
 uploaded_files = st.file_uploader("Choose CSV files", accept_multiple_files=True, type='csv')
-
-st.write("Please exercise caution when using the results, as this method attempts to extrapolate the BBR results beyond the ranges measured by the device. Additionally, several assumptions have been made, including Arrhenius-type temperature dependence, the validity of Generalized Power Law behavior for creep compliance at low temperatures, the incompressibility of binder (with a Poisson's ratio of 0.5), and the applicability of the CA model for complex modulus and phase angle master curves. These assumptions may significantly deviate from the true behavior of the material.")
 
 # If new files are uploaded, clear previous analysis
 if uploaded_files:
