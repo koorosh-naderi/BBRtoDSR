@@ -57,6 +57,54 @@ def find_bracketing_rows(df, column_name, target_value):
         closest_rows = closest_rows.drop(columns='distance')  # Drop the distance column if you don't want it
         return closest_rows
 
+def stiffness(T1):
+    list1 = allresults[allresults['Temperature (C)']==T1].iloc[:,1:4]
+    mat = np.array([
+                    [1,np.log10(8),(np.log10(8))**2],
+                    [1,np.log10(15),(np.log10(15))**2],
+                    [1,np.log10(30),(np.log10(30))**2],
+                    [1,np.log10(60),(np.log10(60))**2],
+                    [1,np.log10(120),(np.log10(120))**2],
+                    [1,np.log10(240),(np.log10(240))**2]]).T
+    list3 = 10**(list1@mat)
+    return list3
+
+def function(T1,T2,a):
+    list1 = allresults[allresults['Temperature (C)']==T1].iloc[:,1:4]
+    list2 = allresults[allresults['Temperature (C)']==T2].iloc[:,1:4]
+
+    mat = np.array([
+                    [1,np.log10(8),(np.log10(8))**2],
+                    [1,np.log10(15),(np.log10(15))**2],
+                    [1,np.log10(30),(np.log10(30))**2],
+                    [1,np.log10(60),(np.log10(60))**2],
+                    [1,np.log10(120),(np.log10(120))**2],
+                    [1,np.log10(240),(np.log10(240))**2]]).T
+
+    list3 = 10**(list1@mat)
+    list4 = 10**(list2@mat)
+
+    
+    logt = [np.log10(8),np.log10(15),np.log10(30),np.log10(60),np.log10(120),np.log10(240)]
+    logtReduced = logt + [-a+x for x in logt]
+    logS = list(np.log10(list3.iloc[0,:]))
+    logS.extend(list(np.log10(list4.iloc[0,:])))
+    slope3, intercept3, r_value3, p_value3, std_err3 = stats.linregress(logtReduced, logS)
+    return 1-abs(r_value3)
+            
+def function_to_minimize(x):
+    return function(fixed_T1, fixed_T2, x[0])
+
+def gpl_minimize(args):
+    m, logD0, logD1 = args
+    creep_comp_calc = (10**logD0)+(10**logD1)*reduced_time**m
+    return sum((np.log10(creep_compliance) - np.log10(creep_comp_calc))**2)
+
+def ca_minimize(args):
+    beta, logOmegaC = args
+    G_calc_CA = 1000*(1+(10**logOmegaC/reduced_omega)**beta)**(-1/beta)
+    return sum((np.log10(G_calc_CA) - np.log10(dynamic_shear_modulus))**2)
+
 # Streamlit app layout
 st.title("BBR Data Processor (alpha release)")
 st.image("BBRtoDSR.jpeg")
@@ -170,48 +218,8 @@ if st.button("Print Results"):
             st.write(f"**$T_{{{'c,S'}}}$: {T_s} °C**")
             st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
             st.write(f"**$Delta T_{'c'}$: {Delta_Tc} °C**")
-            st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {allresults['Temperature (C)'][0]} °C**")
-            
-           
-            def stiffness(T1):
-                list1 = allresults[allresults['Temperature (C)']==T1].iloc[:,1:4]
-                mat = np.array([
-                    [1,np.log10(8),(np.log10(8))**2],
-                    [1,np.log10(15),(np.log10(15))**2],
-                    [1,np.log10(30),(np.log10(30))**2],
-                    [1,np.log10(60),(np.log10(60))**2],
-                    [1,np.log10(120),(np.log10(120))**2],
-                    [1,np.log10(240),(np.log10(240))**2]]).T
-                list3 = 10**(list1@mat)
-                return list3
-           
-            
-           
-            def function(T1,T2,a):
-                list1 = allresults[allresults['Temperature (C)']==T1].iloc[:,1:4]
-                list2 = allresults[allresults['Temperature (C)']==T2].iloc[:,1:4]
-
-                mat = np.array([
-                    [1,np.log10(8),(np.log10(8))**2],
-                    [1,np.log10(15),(np.log10(15))**2],
-                    [1,np.log10(30),(np.log10(30))**2],
-                    [1,np.log10(60),(np.log10(60))**2],
-                    [1,np.log10(120),(np.log10(120))**2],
-                    [1,np.log10(240),(np.log10(240))**2]]).T
-
-                list3 = 10**(list1@mat)
-                list4 = 10**(list2@mat)
-
-    
-                logt = [np.log10(8),np.log10(15),np.log10(30),np.log10(60),np.log10(120),np.log10(240)]
-                logtReduced = logt + [-a+x for x in logt]
-                logS = list(np.log10(list3.iloc[0,:]))
-                logS.extend(list(np.log10(list4.iloc[0,:])))
-                slope3, intercept3, r_value3, p_value3, std_err3 = stats.linregress(logtReduced, logS)
-                return 1-abs(r_value3)
-            
-            def function_to_minimize(x):
-                return function(fixed_T1, fixed_T2, x[0])
+            st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {allresults['Temperature (C)'][0]} °C**")           
+                      
             
             a_T_list = []
             Temperature_list = [allresults['Temperature (C)'][0]]
@@ -285,10 +293,7 @@ if st.button("Print Results"):
             reduced_time = np.array(reduced_time_list)
             creep_compliance = np.array(creep_comp_list)
 
-            def gpl_minimize(args):
-                m, logD0, logD1 = args
-                creep_comp_calc = (10**logD0)+(10**logD1)*reduced_time**m
-                return sum((np.log10(creep_compliance) - np.log10(creep_comp_calc))**2)
+            
             
             initial_data = [0.3,-2,-3]
             
@@ -324,11 +329,6 @@ if st.button("Print Results"):
             dynamic_compliance = (storage_compliance**2 + loss_compliance**2)**0.5
             dynamic_modulus = 1/dynamic_compliance
             dynamic_shear_modulus = dynamic_modulus/(2*(1+0.5))
-            
-            def ca_minimize(args):
-                beta, logOmegaC = args
-                G_calc_CA = 1000*(1+(10**logOmegaC/reduced_omega)**beta)**(-1/beta)
-                return sum((np.log10(G_calc_CA) - np.log10(dynamic_shear_modulus))**2)
             
             initial_data_CA = [0.1,-3]
             result_CA = minimize(ca_minimize, initial_data_CA)
