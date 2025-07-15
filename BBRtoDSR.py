@@ -376,10 +376,27 @@ if st.button("Print Results"):
             
             G_R = (G_GR/(np.sin(np.radians(phase_GR))))*(np.cos(np.radians(phase_GR)))**2
 
-            st.write(f"**G-R: {round(G_R,0)} kPa**")
+            st.write(f"**$G-R$: {round(G_R,0)} kPa**")
             st.write(f"**$G^{'*'}_{{{'G-R'}}}$: {round(G_GR,0)} kPa**")
             st.write(f"**$δ_{{{'G-R'}}}$: {round(phase_GR,0)} °**")
 
+            fig6, ax6 = plt.subplots()
+            ax6.plot(phase_GR, G_GR, label='G-R Parameter', 
+                     linestyle='None',
+                     marker='o')
+            ax6.plot(np.arange(5,85,1),180*np.sin(np.radians(np.arange(5,85,1)))/np.cos(np.radians(np.arange(5,85,1)))**2,label='CA Model',linestyle='-',marker='None')
+            ax6.set_title('Black Diagram')
+            ax6.set_xlabel('Phase Angle (°)')
+            ax6.set_ylabel('G* (kPa)')
+            ax6.set_yscale('log')
+            handles6, labels6 = ax6.get_legend_handles_labels()
+            ax6.legend(handles6, labels6)
+            st.pyplot(fig6)
+
+
+
+
+        
             st.markdown("""---""")
 
             initial_data_T_fatigue = [22]
