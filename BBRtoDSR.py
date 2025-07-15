@@ -384,8 +384,8 @@ if st.button("Print Results"):
             ax6.plot(phase_GR, G_GR, label='G-R Parameter', 
                      linestyle='None',
                      marker='o')
-            ax6.plot(np.arange(5,85,1),180*np.sin(np.radians(np.arange(5,85,1)))/np.cos(np.radians(np.arange(5,85,1)))**2,label='G-R = 180 kPa',linestyle='-',marker='None')
-            ax6.plot(np.arange(5,85,1),600*np.sin(np.radians(np.arange(5,85,1)))/np.cos(np.radians(np.arange(5,85,1)))**2,label='G-R = 600 kPa',linestyle='-',marker='None')
+            ax6.plot(np.arange(1,89,1),180*np.sin(np.radians(np.arange(1,89,1)))/np.cos(np.radians(np.arange(1,89,1)))**2,label='G-R = 180 kPa',linestyle='-',marker='None')
+            ax6.plot(np.arange(1,89,1),600*np.sin(np.radians(np.arange(1,89,1)))/np.cos(np.radians(np.arange(1,89,1)))**2,label='G-R = 600 kPa',linestyle='-',marker='None')
             ax6.set_title('Black Diagram')
             ax6.set_xlabel('Phase Angle (°)')
             ax6.set_ylabel('G* (kPa)')
