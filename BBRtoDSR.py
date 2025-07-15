@@ -329,6 +329,8 @@ if st.button("Print Results"):
             ax2.legend(handles2, labels2)
             st.pyplot(fig2)
 
+            st.markdown("""---""")
+
             reduced_omega = 2/(np.pi*reduced_time)
             storage_compliance = (10**result_gpl.x[1]) + (10**result_gpl.x[2]) * math.gamma(1+result_gpl.x[0]) * (reduced_omega)**(-result_gpl.x[0]) * np.cos(result_gpl.x[0] * np.pi/2)
             loss_compliance = (10**result_gpl.x[2]) * math.gamma(1+result_gpl.x[0]) * (reduced_omega)**(-result_gpl.x[0]) * np.sin(result_gpl.x[0] * np.pi/2)
@@ -344,9 +346,8 @@ if st.button("Print Results"):
             
             st.write(f"**β: {round(result_CA.x[0],3)}**")
             st.write(f"**log$ω_{'C'}$: {round(result_CA.x[1],3)}**")
-            
-            
-            
+
+                        
             fig5, ax5 = plt.subplots()
             ax5.plot(reduced_omega, dynamic_shear_modulus,label='Master Curve', 
                      linestyle='None',
@@ -361,7 +362,9 @@ if st.button("Print Results"):
             handles5, labels5 = ax5.get_legend_handles_labels()
             ax5.legend(handles5, labels5)
             st.pyplot(fig5)
-            
+
+            st.markdown("""---""")
+        
             omega_GR = 0.005
             omega_GR_reduced = 0.005 * 10**(slope4*(1/(15+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
             phase_GR = 90/(1+(omega_GR_reduced/(10**result_CA.x[1]))**result_CA.x[0])
