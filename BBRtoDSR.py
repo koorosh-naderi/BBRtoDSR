@@ -224,9 +224,11 @@ if st.button("Print Results"):
             st.write(f"**$T_{{{'c,S'}}}$: {T_s} °C**")
             st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
             st.write(f"**$Delta T_{'c'}$: {Delta_Tc} °C**")
+
+            st.markdown("""---""")
+        
             st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {allresults['Temperature (C)'][0]} °C**")           
                       
-            
             a_T_list = []
             Temperature_list = [allresults['Temperature (C)'][0]]
             reduced_time_list = [8,15,30,60,120,240]
@@ -251,7 +253,7 @@ if st.button("Print Results"):
                 stiffness_list.extend(stiffness(allresults['Temperature (C)'][i]).iloc[0,:])
                 
                 
-                st.write(f"**logaT={allresults['Temperature (C)'][i]}: {round(np.cumsum(a_T_list)[i-1],2)}**")
+                st.write(f"**$loga_{'T'}$={allresults['Temperature (C)'][i]}: {round(np.cumsum(a_T_list)[i-1],2)}**")
                 
                 
                 
@@ -283,7 +285,7 @@ if st.button("Print Results"):
             
             st.write(f"**$E_{'a'}$: {round(slope4*np.log(10)*8.314462618/1000,3)} kJ/mol**")
             
-            
+            st.markdown("""---""")
             
             ax1.set_title('Plot of Stiffness Mastercurve vs Reduced Time')
             ax1.set_xlabel('Time (s)')
@@ -293,7 +295,8 @@ if st.button("Print Results"):
             handles1, labels1 = ax1.get_legend_handles_labels()
             ax1.legend(handles1, labels1)
             st.pyplot(fig1)
-            
+
+            st.markdown("""---""")
             
             creep_comp_list = [1/i for i in stiffness_list]
             reduced_time = np.array(reduced_time_list)
