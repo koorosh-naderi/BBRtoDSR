@@ -253,7 +253,7 @@ if st.button("Print Results"):
                 stiffness_list.extend(stiffness(allresults['Temperature (C)'][i]).iloc[0,:])
                 
                 
-                st.write(f"**$loga_{{{'T = 'allresults['Temperature (C)'][i]}}}$: {round(np.cumsum(a_T_list)[i-1],2)}**")
+                st.write(f"**$loga_{{{'T = ',allresults['Temperature (C)'][i]}}}$: {round(np.cumsum(a_T_list)[i-1],2)}**")
                 
                 
                 
