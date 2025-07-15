@@ -113,6 +113,28 @@ def T_fatigue_minimize(T):
 
 # Streamlit app layout
 st.title("BBR Data Processor (alpha release)")
+
+# Create a sidebar
+st.sidebar.header("BBRtoDSR")
+st.sidebar.subheader("Important Information")
+
+# Add some descriptive text in the sidebar
+st.sidebar.write("""
+    Please exercise caution when using the results, 
+    as this method attempts to extrapolate the Bending Beam Rheometer results beyond the ranges measured by the device. 
+    Additionally, several assumptions have been made, 
+    including Arrhenius-type temperature dependence, 
+    the validity of Generalized Power Law behavior for creep compliance at low temperatures, 
+    the incompressibility of binder (with a Poisson's ratio of 0.5), 
+    and the applicability of the Christensen–Anderson (CA) model for complex modulus and phase angle master curves. 
+    These assumptions may significantly deviate from the true behavior of the material!
+""")
+
+
+# Add a footer or additional text
+st.sidebar.markdown("### Contact Me")
+st.sidebar.write("For more information, please reach out to me at: [koorosh.naderi@colas.com](mailto:koorosh.naderi@colas.com)")
+
 st.image("BBRtoDSR.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
 st.write("A minimum of two CSV files is required for analysis.")
