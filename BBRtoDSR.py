@@ -254,7 +254,7 @@ if st.button("Print Results"):
             Delta_Tc = round(T_s - T_m,1)
             st.write(f"**$T_{{{'c,S'}}}$: {T_s} °C**")
             st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
-            st.write(f"**$\delta T_{'c'}$: {Delta_Tc} °C**")
+            st.write(f"**$\Δ T_{'c'}$: {Delta_Tc} °C**")
 
             st.markdown("""---""")
         
