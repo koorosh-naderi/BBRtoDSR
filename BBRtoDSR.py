@@ -126,7 +126,7 @@ st.sidebar.write("""
     including Arrhenius-type temperature dependence, 
     the validity of Generalized Power Law behavior for creep compliance at low temperatures, 
     the incompressibility of binder (with a Poisson's ratio of 0.5), 
-    and the applicability of the Christensen–Anderson (CA) model for complex modulus and phase angle master curves. 
+    and the applicability of the [Christensen–Anderson (CA) model](https://doi.org/10.1080/14680629.2016.1267448) for complex modulus and phase angle master curves. 
     These assumptions may significantly deviate from the true behavior of the material!
 """)
 
