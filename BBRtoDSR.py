@@ -385,7 +385,7 @@ if st.button("Print Results"):
             initial_data_T_fatigue = [22]
             result_T_fatigue = minimize(T_fatigue_minimize, initial_data_T_fatigue)    
             
-            st.write(f"**$T_{{{'Fatigue'}}}$: {round(result_T_fatigue.x[0],1)} °C**")
+            st.write(f"**$T_{{{'G"=5000kPa'}}}$: {round(result_T_fatigue.x[0],1)} °C**")
     
     
     
