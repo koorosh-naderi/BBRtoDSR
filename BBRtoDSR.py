@@ -240,7 +240,7 @@ if st.session_state.uploaded_files:
 
     #
 if st.button("Print Results"):
-    st.write("Results printed to console!")
+    st.subheader("Low Temperature Properties")
     allresults.sort_values('Temperature (C)',
                                         axis=0,
                                         ascending=False,inplace=True)
