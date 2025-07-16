@@ -338,7 +338,7 @@ if st.button("Print Results"):
             st.pyplot(fig1)
 
             st.markdown("""---""")
-            st.write(f"**Creep Compliance Mastercurve, Generalized Power Law (GPL)**")
+            st.title(f"**Creep Compliance Mastercurve, Generalized Power Law (GPL)**")
             creep_comp_list = [1/i for i in stiffness_list]
             reduced_time = np.array(reduced_time_list)
             creep_compliance = np.array(creep_comp_list)
