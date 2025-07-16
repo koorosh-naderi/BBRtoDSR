@@ -115,7 +115,7 @@ def T_fatigue_minimize(T):
 st.title("BBR Data Processor (alpha release)")
 
 st.logo(
-    "icon.png"
+    "icon.png", size="large"
 )
 
 
