@@ -114,6 +114,11 @@ def T_fatigue_minimize(T):
 # Streamlit app layout
 st.title("BBR Data Processor (alpha release)")
 
+st.logo(
+    "icon.png"
+)
+
+
 # Create a sidebar
 st.sidebar.header("BBRtoDSR")
 st.sidebar.markdown("""---""")
