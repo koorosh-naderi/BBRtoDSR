@@ -240,6 +240,7 @@ if st.session_state.uploaded_files:
 
     #
 if st.button("Print Results"):
+    st.markdown("""---""")
     st.subheader("Low Temperature Properties")
     allresults.sort_values('Temperature (C)',
                                         axis=0,
