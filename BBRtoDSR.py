@@ -322,6 +322,7 @@ if st.button("Print Results"):
             
             st.write(f"**$E_{'a'}$: {round(slope4*np.log(10)*8.314462618/1000,3)} kJ/mol**")
             st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$**")
+            st.write(f"**Please note that the temperature is converted to Kelvin, and 'ln' in the function refers to the natural logarithm.**")
             
             st.markdown("""---""")
             
@@ -403,6 +404,9 @@ if st.button("Print Results"):
             handles5, labels5 = ax5.get_legend_handles_labels()
             ax5.legend(handles5, labels5)
             st.pyplot(fig5)
+        
+            st.write(f"**Rheological Index: {round(np.log10(2)/result_CA.x[0],2)}**")
+        
 
             st.markdown("""---""")
         
