@@ -116,6 +116,7 @@ st.title("BBR Data Processor (alpha release)")
 
 # Create a sidebar
 st.sidebar.header("BBRtoDSR")
+st.sidebar.markdown("""---""")
 st.sidebar.subheader("Important Information")
 
 # Add some descriptive text in the sidebar
@@ -129,7 +130,7 @@ st.sidebar.write("""
     and the applicability of the [Christensen–Anderson (CA) model](https://doi.org/10.1080/14680629.2016.1267448) for complex modulus and phase angle master curves. 
     These assumptions may significantly deviate from the true behavior of the material!
 """)
-
+st.sidebar.markdown("""---""")
 
 # Add a footer or additional text
 st.sidebar.markdown("### Contact Me")
