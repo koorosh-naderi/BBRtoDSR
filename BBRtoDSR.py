@@ -406,6 +406,7 @@ if st.button("Print Results"):
             st.pyplot(fig5)
         
             st.write(f"**Rheological Index: {round(np.log10(2)/result_CA.x[0],2)}**")
+            st.write(f"**The glassy modulus ($G_{'g'}$) was assumed to be a constant value of 1 GPa.**")
         
 
             st.markdown("""---""")
