@@ -265,7 +265,7 @@ if st.button("Print Results"):
             st.markdown("""---""")
 
         
-            st.write(f"**Time-temperature Superposition, Shift factor using Arrhenius law**")
+            st.subheader(f"**Time-temperature Superposition, Shift factor using Arrhenius law**")
             st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {allresults['Temperature (C)'][0]} °C**")           
                       
             a_T_list = []
@@ -338,7 +338,7 @@ if st.button("Print Results"):
             st.pyplot(fig1)
 
             st.markdown("""---""")
-            st.title(f"**Creep Compliance Mastercurve, Generalized Power Law (GPL)**")
+            st.subheader(f"**Creep Compliance Mastercurve, Generalized Power Law (GPL)**")
             creep_comp_list = [1/i for i in stiffness_list]
             reduced_time = np.array(reduced_time_list)
             creep_compliance = np.array(creep_comp_list)
@@ -374,7 +374,7 @@ if st.button("Print Results"):
             st.pyplot(fig2)
 
             st.markdown("""---""")
-            st.write(f"**Complex Modulus Mastercurve, Christensen–Anderson (CA) Model**")
+            st.subheader(f"**Complex Modulus Mastercurve, Christensen–Anderson (CA) Model**")
 
             reduced_omega = 2/(np.pi*reduced_time)
             storage_compliance = (10**result_gpl.x[1]) + (10**result_gpl.x[2]) * math.gamma(1+result_gpl.x[0]) * (reduced_omega)**(-result_gpl.x[0]) * np.cos(result_gpl.x[0] * np.pi/2)
@@ -413,6 +413,8 @@ if st.button("Print Results"):
         
 
             st.markdown("""---""")
+            st.subheader(f"**Glover-Rowe Parameter, Cracking Performance**")
+
         
             omega_GR = 0.005
             omega_GR_reduced = 0.005 * 10**(slope4*(1/(15+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
