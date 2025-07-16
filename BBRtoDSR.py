@@ -130,7 +130,7 @@ st.sidebar.write("""
     as this method attempts to extrapolate the Bending Beam Rheometer results beyond the ranges measured by the device. 
     Additionally, several assumptions have been made, 
     including Arrhenius-type temperature dependence, 
-    the validity of Generalized Power Law behavior for creep compliance at low temperatures, 
+    the validity of [Generalized Power Law behavior for creep compliance at low temperatures](https://www.fhwa.dot.gov/publications/research/infrastructure/pavements/ltpp/10035/009.cfm), 
     the incompressibility of binder (with a Poisson's ratio of 0.5), 
     and the applicability of the [Christensen–Anderson (CA) model](https://doi.org/10.1080/14680629.2016.1267448) for complex modulus and phase angle master curves. 
     These assumptions may significantly deviate from the true behavior of the material!
