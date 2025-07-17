@@ -121,13 +121,13 @@ st.logo(
 
 # Create a sidebar
 st.sidebar.header("BBRtoDSR")
-
-st.sidebar.markdown("""---""")
-st.sidebar.subheader("Important Information")
 st.sidebar.write("""
     This app reads CSV files from BBR tests and attempts to transform the data into dynamic shear results typically obtained from a DSR device. 
     By applying various rheological models and functions, it calculates different rheological properties.
 """)
+
+st.sidebar.markdown("""---""")
+st.sidebar.subheader("Important Information")
 # Add some descriptive text in the sidebar
 st.sidebar.write("""
     Please exercise caution when using the results, 
