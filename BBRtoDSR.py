@@ -154,7 +154,7 @@ st.sidebar.markdown("""
 
 st.image("BBRtoDSR.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
-st.write("A minimum of two CSV files is required for analysis.")
+st.write("A minimum of two CSV files is required for analysis. Please note that only CSV files from Cannon® Instrument Company can be read by the app.")
 
 # Session state to track uploaded files
 if 'uploaded_files' not in st.session_state:
