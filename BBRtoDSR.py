@@ -490,7 +490,7 @@ if st.button("Print Results"):
             ax7.plot(phase_fatigue_list, G_fatigue_list, label='Superpave Fatigue Criteria', 
                      linestyle='None',
                      marker='o')
-            ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 5000 kPa',linestyle='-',marker='None')
+            ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 5000 kPa',linestyle='--',marker='None',c='black')
             ax7.set_title('Black Diagram')
             ax7.set_xlabel('Phase Angle (°)')
             ax7.set_ylabel('G* (kPa)')
@@ -499,7 +499,7 @@ if st.button("Print Results"):
             handles7, labels7 = ax7.get_legend_handles_labels()
             ax7.legend(handles7, labels7)
             for x, y, z in zip(phase_fatigue_list, G_fatigue_list, Temperature_fatigue_list):
-                ax7.text(x, y, z, fontsize=8)
+                ax7.text(x, y, f"T = {z}°C", fontsize=8)
             st.pyplot(fig7)
     
     
