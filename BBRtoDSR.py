@@ -530,8 +530,8 @@ if st.button("Print Results"):
             ax8.plot(newphase_CA, newG_CA, label='CA Model Points', 
                      linestyle='None',
                      marker='o', alpha=0.6)
-            ax8.vlines(x=42,ymin=8967,ymax=1e6,linestyle='--',marker='')
-            ax8.hlines(y=8967,xmin=0,xmax=90,linestyle='--',marker='')
+            ax8.vlines(x=42,ymin=8967,ymax=1e6,linestyle='--')
+            ax8.hlines(y=8967,xmin=0,xmax=90,linestyle='--')
             ax8.set_title('Black Diagram')
             ax8.set_xlabel('Phase Angle (°)')
             ax8.set_ylabel('G* (kPa)')
