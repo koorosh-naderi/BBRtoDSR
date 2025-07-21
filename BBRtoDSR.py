@@ -498,8 +498,8 @@ if st.button("Print Results"):
             ax7.set_ylim(1,1e6)
             handles7, labels7 = ax7.get_legend_handles_labels()
             ax7.legend(handles7, labels7)
-            for i, x, y in enumerate(zip(phase_fatigue_list, G_fatigue_list)):
-                ax7.text(x, y, Temperature_fatigue_list[i], fontsize=8)
+            for x, y, z in zip(phase_fatigue_list, G_fatigue_list, Temperature_fatigue_list):
+                ax7.text(x, y, z, fontsize=8)
             st.pyplot(fig7)
     
     
