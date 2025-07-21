@@ -476,12 +476,12 @@ if st.button("Print Results"):
             G_storage_fatigue_list = G_fatigue_list * np.cos(np.radians(phase_fatigue_list))
             G_loss_fatigue_list = G_fatigue_list * np.sin(np.radians(phase_fatigue_list))
             
-            fatigue_list = pd.DataFrame(columns=['Temperature (°C)','Phase Angle (°)','Complex Modulus (kPa)',"Storage Modulus - G' (kPa)",'Loss Modulus - G" (kPa)'])
+            fatigue_list = pd.DataFrame(columns=['Temperature (°C)','Phase Angle (°)','G* (kPa)',"G' (kPa)",'G" (kPa)'])
             fatigue_list['Temperature (°C)'] = Temperature_fatigue_list
-            fatigue_list['Phase Angle (°)'] = phase_fatigue_list
-            fatigue_list['Complex Modulus (kPa)'] = G_fatigue_list
-            fatigue_list["Storage Modulus - G' (kPa)"] = G_storage_fatigue_list
-            fatigue_list['Loss Modulus - G" (kPa)'] = G_loss_fatigue_list
+            fatigue_list['Phase Angle (°)'] = round(phase_fatigue_list,1)
+            fatigue_list['G* (kPa)'] = round(G_fatigue_list,0)
+            fatigue_list["G' (kPa)"] = round(G_storage_fatigue_list,0)
+            fatigue_list['G" (kPa)'] = round(G_loss_fatigue_list,0)
             
             st.dataframe(fatigue_list)
     
