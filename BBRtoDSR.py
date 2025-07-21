@@ -488,7 +488,7 @@ if st.button("Print Results"):
             st.dataframe(fatigue_list, hide_index = True)
 
             fig7, ax7 = plt.subplots()
-            ax7.plot(phase_fatigue_list, G_fatigue_list, label='Superpave Fatigue Criteria', 
+            ax7.plot(phase_fatigue_list, G_fatigue_list, label='Superpave Fatigue Points, ω = 10 Rad/s', 
                      linestyle='None',
                      marker='o', alpha=0.6)
             ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 5000 kPa',linestyle='--',marker='None',c='black')
