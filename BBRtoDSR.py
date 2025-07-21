@@ -124,7 +124,7 @@ def T_pavel_kriz(T):
     return (8967-G_pavel_kriz)**2
 
 # Streamlit app layout
-st.title("BBR Data Processor (alpha release)")
+st.title("BBR Data Processor (beta release)")
 
 st.logo(
     "icon.png", size="large"
