@@ -220,7 +220,7 @@ if st.session_state.uploaded_files:
         
         # Display the uploaded dataframe
         st.write(f"**Data from {uploaded_file.name}:**")
-        st.dataframe(results)
+        st.dataframe(results, hide_index = True)
         
         temperature = np.float64(info[2][4])
         
@@ -256,7 +256,7 @@ if st.button("Print Results"):
                                         axis=0,
                                         ascending=False,inplace=True)
     allresults.reset_index(drop=True, inplace=True)
-    st.dataframe(allresults)
+    st.dataframe(allresults , hide_index = True)
     
     
     
@@ -483,7 +483,7 @@ if st.button("Print Results"):
             fatigue_list["G' (kPa)"] = np.round(G_storage_fatigue_list,0)
             fatigue_list['G" (kPa)'] = np.round(G_loss_fatigue_list,0)
             
-            st.dataframe(fatigue_list)
+            st.dataframe(fatigue_list, hide_index = True)
     
     
     
