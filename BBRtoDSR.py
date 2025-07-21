@@ -111,6 +111,12 @@ def T_fatigue_minimize(T):
     G_fatigue = 1000*1000*(1+(10**result_CA.x[1]/omega_red_T_fatigue)**result_CA.x[0])**(-1/result_CA.x[0])
     return (5000-G_fatigue*np.sin(np.radians(phase_fatigue)))**2
 
+def T_fatigue_6000_minimize(T):
+    omega_red_T_fatigue = 10*10**(slope4*(1/(T+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+    phase_fatigue = 90/(1+(omega_red_T_fatigue/(10**result_CA.x[1]))**result_CA.x[0])
+    G_fatigue = 1000*1000*(1+(10**result_CA.x[1]/omega_red_T_fatigue)**result_CA.x[0])**(-1/result_CA.x[0])
+    return (6000-G_fatigue*np.sin(np.radians(phase_fatigue)))**2
+
 # Streamlit app layout
 st.title("BBR Data Processor (alpha release)")
 
@@ -457,6 +463,11 @@ if st.button("Print Results"):
 
             st.subheader(f"**Fatigue Cracking Criteria**")
             st.write(f"**$T_{{{'G"=5000kPa'}}}$: {round(result_T_fatigue.x[0],1)} °C**")
+
+            initial_data_T_fatigue_6000 = [22]
+            result_T_fatigue_6000 = minimize(T_fatigue_6000_minimize, initial_data_T_fatigue_6000)
+
+            st.write(f"**$T_{{{'G"=6000kPa'}}}$: {round(result_T_fatigue_6000.x[0],1)} °C**")
     
     
     
