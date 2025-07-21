@@ -499,7 +499,7 @@ if st.button("Print Results"):
             handles7, labels7 = ax7.get_legend_handles_labels()
             ax7.legend(handles7, labels7)
             for x, y, z in zip(phase_fatigue_list, G_fatigue_list, Temperature_fatigue_list):
-                ax7.text(x, y, f"T = {z}°C", fontsize=8)
+                ax7.text(x, y, f"{z}°C", fontsize=8)
             st.pyplot(fig7)
     
     
