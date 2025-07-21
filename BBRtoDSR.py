@@ -448,7 +448,8 @@ if st.button("Print Results"):
             ax6.set_xlabel('Phase Angle (°)')
             ax6.set_ylabel('G* (kPa)')
             ax6.set_yscale('log')
-            ax6.set_ylim(1,1e6)    
+            ax6.set_ylim(1,1e6)
+            ax6.set_xlim(0,90)
             handles6, labels6 = ax6.get_legend_handles_labels()
             ax6.legend(handles6, labels6)
             st.pyplot(fig6)
@@ -496,6 +497,7 @@ if st.button("Print Results"):
             ax7.set_ylabel('G* (kPa)')
             ax7.set_yscale('log')
             ax7.set_ylim(1,1e6)
+            ax7.set_xlim(0,90)
             handles7, labels7 = ax7.get_legend_handles_labels()
             ax7.legend(handles7, labels7)
             for x, y, z in zip(phase_fatigue_list, G_fatigue_list, Temperature_fatigue_list):
