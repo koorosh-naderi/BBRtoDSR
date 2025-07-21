@@ -119,8 +119,8 @@ def T_fatigue_6000_minimize(T):
 
 def T_pavel_kriz(T):
     omega_red_T_pavel_kriz = 10*10**(slope4*(1/(T+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
-    phase_pavel_kriz = 90/(1+(omega_red_T_fatigue/(10**result_CA.x[1]))**result_CA.x[0])
-    G_pavel_kriz = 1000*1000*(1+(10**result_CA.x[1]/omega_red_T_fatigue)**result_CA.x[0])**(-1/result_CA.x[0])
+    phase_pavel_kriz = 90/(1+(omega_red_T_pavel_kriz/(10**result_CA.x[1]))**result_CA.x[0])
+    G_pavel_kriz = 1000*1000*(1+(10**result_CA.x[1]/omega_red_T_pavel_kriz)**result_CA.x[0])**(-1/result_CA.x[0])
     return (8967-G_pavel_kriz)**2
 
 # Streamlit app layout
