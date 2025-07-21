@@ -117,6 +117,12 @@ def T_fatigue_6000_minimize(T):
     G_fatigue = 1000*1000*(1+(10**result_CA.x[1]/omega_red_T_fatigue)**result_CA.x[0])**(-1/result_CA.x[0])
     return (6000-G_fatigue*np.sin(np.radians(phase_fatigue)))**2
 
+def T_pavel_kriz(T):
+    omega_red_T_pavel_kriz = 10*10**(slope4*(1/(T+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+    phase_pavel_kriz = 90/(1+(omega_red_T_fatigue/(10**result_CA.x[1]))**result_CA.x[0])
+    G_pavel_kriz = 1000*1000*(1+(10**result_CA.x[1]/omega_red_T_fatigue)**result_CA.x[0])**(-1/result_CA.x[0])
+    return (8967-G_pavel_kriz)**2
+
 # Streamlit app layout
 st.title("BBR Data Processor (alpha release)")
 
@@ -503,6 +509,24 @@ if st.button("Print Results"):
             for x, y, z in zip(phase_fatigue_list, G_fatigue_list, Temperature_fatigue_list):
                 ax7.text(x, y, f"{z}°C", fontsize=7)
             st.pyplot(fig7)
+
+
+            st.markdown("""---""")
+            st.subheader(f"**Pavel-Kriz Phase Angle**")
+
+            initial_data_T_pavel_kriz = [22]
+            result_T_pavel_kriz = minimize(T_pavel_kriz, initial_data_T_pavel_kriz)
+        
+            Omega_pavel_kriz = 10 * 10**(slope4*(1/(result_T_pavel_kriz.x[0]+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+            phase_pavel_kriz = 90/(1+(Omega_pavel_kriz/(10**result_CA.x[1]))**result_CA.x[0])
+
+            st.write(f"ω = 10 Rad/s")
+            st.write(f"T = {result_T_pavel_kriz.x[0]} °C")
+            st.write(f"**$δ_{{{'G*=8967kPa'}}}$: {round(phase_pavel_kriz,1)} °**")
+
+            
+
+        
     
     
     
