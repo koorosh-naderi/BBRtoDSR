@@ -497,7 +497,7 @@ if st.button("Print Results"):
             fig7, ax7 = plt.subplots()
             ax7.plot(phase_fatigue_list, G_fatigue_list, label='Superpave Fatigue Points, ω = 10 Rad/s', 
                      linestyle='None',
-                     marker='o', alpha=0.6, markersize=10)
+                     marker='o', alpha=0.6, markersize=5)
             ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 5000 kPa',linestyle='--',marker='None',c='black')
             ax7.set_title('Black Diagram')
             ax7.set_xlabel('Phase Angle (°)')
