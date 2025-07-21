@@ -287,8 +287,8 @@ if st.button("Print Results"):
             fig1, ax1 = plt.subplots()
             
             ax1.plot([8,15,30,60,120,240], stiffness(allresults['Temperature (C)'][0]).iloc[0,:],label=allresults['Temperature (C)'][0], 
-                     linestyle='-', linewidth=7.0, alpha=0.4,
-                     marker='')
+                     linestyle='-', linewidth=5.0, alpha=0.4,
+                     marker='o')
             
             for i in range(1,len(allresults)):
                 fixed_T1 = allresults['Temperature (C)'][i-1]
@@ -310,7 +310,7 @@ if st.button("Print Results"):
                 ax1.plot([8,15,30,60,120,240]/(10**np.cumsum(a_T_list)[i-1]),
                          stiffness(allresults['Temperature (C)'][i]).iloc[0,:],
                                    label=allresults['Temperature (C)'][i], 
-                                   linestyle='-',marker='', linewidth=7.0, alpha=0.4)
+                                   linestyle='-',marker='o', linewidth=5.0, alpha=0.4)
             
             Trans_temp = np.array([1/(273.15 + x)-1/(273.15+Temperature_list[0]) for x in Temperature_list])
             logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
