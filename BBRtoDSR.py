@@ -521,7 +521,7 @@ if st.button("Print Results"):
             phase_pavel_kriz = 90/(1+(Omega_pavel_kriz/(10**result_CA.x[1]))**result_CA.x[0])
 
             st.write(f"ω = 10 Rad/s")
-            st.write(f"T = {result_T_pavel_kriz.x[0]} °C")
+            st.write(f"T = {round(result_T_pavel_kriz.x[0],1)} °C")
             st.write(f"**$δ_{{{'G*=8967kPa'}}}$: {round(phase_pavel_kriz,1)} °**")
 
             
