@@ -468,6 +468,22 @@ if st.button("Print Results"):
             result_T_fatigue_6000 = minimize(T_fatigue_6000_minimize, initial_data_T_fatigue_6000)
 
             st.write(f"**$T_{{{'G"=6000kPa'}}}$: {round(result_T_fatigue_6000.x[0],1)} °C**")
+
+            Temperature_fatigue_list = np.array([10, 13, 16, 19, 22, 25, 28])
+            Omega_fatigue_list = 10 * 10**(slope4*(1/(Temperature_fatigue_list+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+            phase_fatigue_list = 90/(1+(Omega_fatigue_list/(10**result_CA.x[1]))**result_CA.x[0])
+            G_fatigue_list = 1000*1000*(1+(10**result_CA.x[1]/Omega_fatigue_list)**result_CA.x[0])**(-1/result_CA.x[0])
+            G_storage_fatigue_list = G_fatigue_list * np.cos(np.radians(phase_fatigue_list))
+            G_loss_fatigue_list = G_fatigue_list * np.sin(np.radians(phase_fatigue_list))
+            
+            fatigue_list = pd.DataFrame(columns=['Temperature (°C)','Phase Angle (°)','Complex Modulus (kPa)',"Storage Modulus - G' (kPa)",'Loss Modulus - G" (kPa)'])
+            fatigue_list['Temperature (°C)'] = Temperature_fatigue_list
+            fatigue_list['Phase Angle (°)'] = phase_fatigue_list
+            fatigue_list['Complex Modulus (kPa)'] = G_fatigue_list
+            fatigue_list["Storage Modulus - G' (kPa)"] = G_storage_fatigue_list
+            fatigue_list['Loss Modulus - G" (kPa)'] = G_loss_fatigue_list
+            
+            st.dataframe(fatigue_list)
     
     
     
