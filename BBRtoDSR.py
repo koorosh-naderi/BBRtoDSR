@@ -483,9 +483,7 @@ if st.button("Print Results"):
             fatigue_list["G' (kPa)"] = np.round(G_storage_fatigue_list,0)
             fatigue_list['G" (kPa)'] = np.round(G_loss_fatigue_list,0)
 
-            styled_fatigue_list = fatigue_list.style.set_properties(**{'text-align': 'center'})
-
-            st.dataframe(styled_fatigue_list, hide_index = True)
+            st.dataframe(fatigue_list, hide_index = True)
     
     
     
