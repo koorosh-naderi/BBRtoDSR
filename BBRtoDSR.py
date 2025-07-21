@@ -478,10 +478,10 @@ if st.button("Print Results"):
             
             fatigue_list = pd.DataFrame(columns=['Temperature (°C)','Phase Angle (°)','G* (kPa)',"G' (kPa)",'G" (kPa)'])
             fatigue_list['Temperature (°C)'] = Temperature_fatigue_list
-            fatigue_list['Phase Angle (°)'] = round(phase_fatigue_list,1)
-            fatigue_list['G* (kPa)'] = round(G_fatigue_list,0)
-            fatigue_list["G' (kPa)"] = round(G_storage_fatigue_list,0)
-            fatigue_list['G" (kPa)'] = round(G_loss_fatigue_list,0)
+            fatigue_list['Phase Angle (°)'] = np.round(phase_fatigue_list,1)
+            fatigue_list['G* (kPa)'] = np.round(G_fatigue_list,0)
+            fatigue_list["G' (kPa)"] = np.round(G_storage_fatigue_list,0)
+            fatigue_list['G" (kPa)'] = np.round(G_loss_fatigue_list,0)
             
             st.dataframe(fatigue_list)
     
