@@ -471,7 +471,7 @@ if st.button("Print Results"):
 
             st.write(f"**$T_{{{'G"=6000kPa'}}}$: {round(result_T_fatigue_6000.x[0],1)} °C**")
 
-            Temperature_fatigue_list = np.array([10, 13, 16, 19, 22, 25, 28])
+            Temperature_fatigue_list = np.array([4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 40])
             Omega_fatigue_list = 10 * 10**(slope4*(1/(Temperature_fatigue_list+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
             phase_fatigue_list = 90/(1+(Omega_fatigue_list/(10**result_CA.x[1]))**result_CA.x[0])
             G_fatigue_list = 1000*1000*(1+(10**result_CA.x[1]/Omega_fatigue_list)**result_CA.x[0])**(-1/result_CA.x[0])
