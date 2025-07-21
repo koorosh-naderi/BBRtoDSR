@@ -512,7 +512,7 @@ if st.button("Print Results"):
 
 
             st.markdown("""---""")
-            st.subheader(f"**Pavel-Kriz Phase Angle**")
+            st.subheader(f"**Pavel-Kriz Phase Angle, [Detection of Phase Incompatible Binders](https://www.ctaa.ca/download/abstracts-2020/Abstract-2020-020-Kriz.pdf)**")
 
             initial_data_T_pavel_kriz = [22]
             result_T_pavel_kriz = minimize(T_pavel_kriz, initial_data_T_pavel_kriz)
