@@ -292,7 +292,7 @@ if st.button("Print Results"):
             
             fig1, ax1 = plt.subplots()
             
-            ax1.plot([8,15,30,60,120,240], stiffness(allresults['Temperature (C)'][0]).iloc[0,:],label=allresults['Temperature (C)'][0], 
+            ax1.plot([8,15,30,60,120,240], stiffness(allresults['Temperature (C)'][0]).iloc[0,:],label=f'{allresults['Temperature (C)'][0]} °C', 
                      linestyle='-', linewidth=5.0, alpha=0.4,
                      marker='o')
             
