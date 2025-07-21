@@ -315,7 +315,7 @@ if st.button("Print Results"):
                 
                 ax1.plot([8,15,30,60,120,240]/(10**np.cumsum(a_T_list)[i-1]),
                          stiffness(allresults['Temperature (C)'][i]).iloc[0,:],
-                                   label=allresults['Temperature (C)'][i], 
+                                   label=f'{allresults['Temperature (C)'][i]} °C', 
                                    linestyle='-',marker='o', linewidth=5.0, alpha=0.4)
             
             Trans_temp = np.array([1/(273.15 + x)-1/(273.15+Temperature_list[0]) for x in Temperature_list])
