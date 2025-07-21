@@ -448,7 +448,7 @@ if st.button("Print Results"):
             ax6.set_xlabel('Phase Angle (°)')
             ax6.set_ylabel('G* (kPa)')
             ax6.set_yscale('log')
-            ax6.set_ylim(1,1e6)
+            ax6.set_ylim(top=1e6)
             ax6.set_xlim(0,90)
             handles6, labels6 = ax6.get_legend_handles_labels()
             ax6.legend(handles6, labels6)
