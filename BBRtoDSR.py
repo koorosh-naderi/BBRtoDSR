@@ -405,6 +405,7 @@ if st.button("Print Results"):
             
             newomega = 10**np.linspace(np.log10(reduced_omega).min(),np.log10(reduced_omega).max(),50)
             newG_CA = 1000*(1+(10**result_CA.x[1]/newomega)**result_CA.x[0])**(-1/result_CA.x[0])
+            newphase_CA = 90/(1+(newomega/(10**result_CA.x[1]))**result_CA.x[0])
             
             st.write(f"**β: {round(result_CA.x[0],3)}**")
             st.write(f"**log$ω_{'C'}$: {round(result_CA.x[1],3)}**")
@@ -523,6 +524,23 @@ if st.button("Print Results"):
             st.write(f"ω = 10 Rad/s")
             st.write(f"T = {round(result_T_pavel_kriz.x[0],1)} °C")
             st.write(f"**$δ_{{{'G*=8967kPa'}}}$: {round(phase_pavel_kriz,1)} °**")
+
+
+            fig8, ax8 = plt.subplots()
+            ax8.plot(newphase_CA, newG_CA, label='CA Model Points', 
+                     linestyle='None',
+                     marker='o', alpha=0.6)
+            ax8.vlines(x=42,ymin=8967,ymax=1e6,linestyle='--',marker='')
+            ax8.hlines(y=8967,xmin=0,xmax=90,linestyle='--',marker='')
+            ax8.set_title('Black Diagram')
+            ax8.set_xlabel('Phase Angle (°)')
+            ax8.set_ylabel('G* (kPa)')
+            ax8.set_yscale('log')
+            ax8.set_ylim(1,1e6)
+            ax8.set_xlim(0,90)
+            handles8, labels8 = ax8.get_legend_handles_labels()
+            ax8.legend(handles8, labels8)
+            st.pyplot(fig8)
 
             
 
