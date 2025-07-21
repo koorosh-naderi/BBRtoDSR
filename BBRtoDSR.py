@@ -484,6 +484,19 @@ if st.button("Print Results"):
             fatigue_list['G" (kPa)'] = np.round(G_loss_fatigue_list,0)
 
             st.dataframe(fatigue_list, hide_index = True)
+
+            fig7, ax7 = plt.subplots()
+            ax7.plot(phase_fatigue_list, G_fatigue_list, label='Superpave Fatigue Criteria', 
+                     linestyle='None',
+                     marker='o')
+            ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 5000 kPa',linestyle='-',marker='None')
+            ax7.set_title('Black Diagram')
+            ax7.set_xlabel('Phase Angle (°)')
+            ax7.set_ylabel('G* (kPa)')
+            ax7.set_yscale('log')
+            handles7, labels7 = ax7.get_legend_handles_labels()
+            ax7.legend(handles6, labels6)
+            st.pyplot(fig7)
     
     
     
