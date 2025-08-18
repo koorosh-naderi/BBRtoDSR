@@ -123,6 +123,22 @@ def T_pavel_kriz(T):
     G_pavel_kriz = 1000*1000*(1+(10**result_CA.x[1]/omega_red_T_pavel_kriz)**result_CA.x[0])**(-1/result_CA.x[0])
     return (8967-G_pavel_kriz)**2
 
+def count_lines(file):
+    try:
+        # Attempt to read the file content
+        content = file.getvalue()
+        try:
+            decoded_content = content.decode("utf-8")
+        except UnicodeDecodeError:
+            # Fallback to a different encoding if UTF-8 fails
+            decoded_content = content.decode("ISO-8859-1")  # or "latin1" or "cp1252"
+        
+        lines = decoded_content.splitlines()
+        return len(lines)
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        return None
+
 # Streamlit app layout
 st.title("BBR Data Processor (beta release)")
 
@@ -194,43 +210,68 @@ allresults = pd.DataFrame(columns=['Temperature (C)','A','B','C','S(60)','m-valu
 if st.session_state.uploaded_files:
     dataframes = []
     for uploaded_file in uploaded_files:
+        num_lines = count_lines(uploaded_file)
+        if num_lines>44:
+            try:
+                df = pd.read_csv(uploaded_file,
+                    header=None,engine='python',names=range(1,6))
+            
+                info = df.iloc[0:9,0:2]
+                data = df.iloc[9:,:].dropna(axis=1)
+                data.columns = data.iloc[0]
+                data = data[1:]
+                data.reset_index(drop=True,inplace=True)
+                data = data.rename_axis(None, axis=1)
+                BeamSpan = np.float64(info[2][6])/1000
+                BeamWidth = np.float64(info[2][7])/1000
+                BeamThickness = np.float64(info[2][8])/1000
+                data['Stiffness (MPa)'] = 1/1000000*(np.float64(data['Force (mN)'])*BeamSpan**3)/(np.float64(data['Deflection (mm)'])*4*BeamWidth*BeamThickness**3)
+                data['log(t)'] = np.log10(np.float64(data['Time (s)']))
+                data['log(S)'] = np.log10(data['Stiffness (MPa)'])
+            
+                results = data[data['Time (s)'].isin(['8','15','30','60','120','240'])]
+                model = np.poly1d(np.polyfit(results['log(t)'], results['log(S)'], 2))
+            
+                data['Sc (MPa)'] = 10**model(np.float64(data['log(t)']))
+                data['Percent diff'] = (data['Stiffness (MPa)']-data['Sc (MPa)'])/data['Stiffness (MPa)']*100
+                data['m-value'] = abs(2*model.coefficients[0]*data['log(t)']+model.coefficients[1])
+                
+                results = data[data['Time (s)'].isin(['8','15','30','60','120','240'])]
+                temperature = np.float64(info[2][4])
+            except:
+                st.error("The file is not compatible.")
         
-        df = pd.read_csv(uploaded_file,
-                header=None,engine='python',names=range(1,6))
-        
-        info = df.iloc[0:9,0:2]
-        data = df.iloc[9:,:].dropna(axis=1)
-        data.columns = data.iloc[0]
-        data = data[1:]
-        data.reset_index(drop=True,inplace=True)
-        data = data.rename_axis(None, axis=1)
-        BeamSpan = np.float64(info[2][6])/1000
-        BeamWidth = np.float64(info[2][7])/1000
-        BeamThickness = np.float64(info[2][8])/1000
-        data['Stiffness (MPa)'] = 1/1000000*(np.float64(data['Force (mN)'])*BeamSpan**3)/(np.float64(data['Deflection (mm)'])*4*BeamWidth*BeamThickness**3)
-        data['log(t)'] = np.log10(np.float64(data['Time (s)']))
-        data['log(S)'] = np.log10(data['Stiffness (MPa)'])
-        
-        results = data[data['Time (s)'].isin(['8','15','30','60','120','240'])]
-        model = np.poly1d(np.polyfit(results['log(t)'], results['log(S)'], 2))
-        
-        data['Sc (MPa)'] = 10**model(np.float64(data['log(t)']))
-        data['Percent diff'] = (data['Stiffness (MPa)']-data['Sc (MPa)'])/data['Stiffness (MPa)']*100
-        data['m-value'] = abs(2*model.coefficients[0]*data['log(t)']+model.coefficients[1])
-        
-        
-        
-        results = data[data['Time (s)'].isin(['8','15','30','60','120','240'])]
-        
-        
-        
+        elif num_lines==44:
+            
+            try:
+                df = pd.read_csv(uploaded_file, header=None,engine='python', encoding='unicode_escape',skiprows=38)
+                uploaded_file.seek(0)
+                dfhead = pd.read_csv(uploaded_file,header=None,engine='python', encoding='unicode_escape',nrows=36,index_col=False)
+                
+                data = pd.DataFrame()
+                data['Time (s)'] = df[0]
+                data['Force (mN)'] = df[1]
+                data['Deflection (mm)'] = df[2]
+                data['Temperature (C)'] = dfhead.iloc[6,1]
+                data['Stiffness (MPa)'] = df[3]
+                data['log(t)'] = np.log10(np.float64(data['Time (s)']))
+                data['log(S)'] = np.log10(data['Stiffness (MPa)'])
+                data['Sc (MPa)'] = df[4]
+                data['Percent diff'] = (data['Stiffness (MPa)']-data['Sc (MPa)'])/data['Stiffness (MPa)']*100
+                data['m-value'] = df[6]
+                results = data
+                model = np.poly1d(np.polyfit(results['log(t)'], results['log(S)'], 2))
+                temperature = np.float64(dfhead.iloc[6,1])
+            except:
+                st.error("The file is not compatible.")
+        else:
+            st.error("The file is not compatible.")
+
         # Display the uploaded dataframe
         st.write(f"**Data from {uploaded_file.name}:**")
         st.dataframe(results, hide_index = True)
         
-        temperature = np.float64(info[2][4])
-        
-        if abs(np.float64(results['Temperature (C)']).mean()-np.float64(info[2][4]))>0.1 :
+        if abs(np.float64(results['Temperature (C)']).mean()-temperature)>0.1 :
             print(f"Temperature Control was not correct and the value considered is the test temperature not the intended temperature of {info[2][4]}.")
             temperature = np.float64(results['Temperature (C)']).mean()
         
@@ -557,4 +598,5 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
