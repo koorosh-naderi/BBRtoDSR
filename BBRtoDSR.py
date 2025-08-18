@@ -269,27 +269,31 @@ if st.session_state.uploaded_files:
 
         # Display the uploaded dataframe
         st.write(f"**Data from {uploaded_file.name}:**")
-        st.dataframe(results, hide_index = True)
         
-        if abs(np.float64(results['Temperature (C)']).mean()-temperature)>0.1 :
-            print(f"Temperature Control was not correct and the value considered is the test temperature not the intended temperature of {info[2][4]}.")
-            temperature = np.float64(results['Temperature (C)']).mean()
-        
-        allresults.loc[len(allresults)] = [temperature,
-                                           model.coefficients[2],
-                                           model.coefficients[1],
-                                           model.coefficients[0],
-                                           10**(model(np.log10(60))),
-                                           abs(2*model.coefficients[0]*np.log10(60)+model.coefficients[1])]
-        
-        
-        # Calculate and display the mean of the first column
-        #mean_value = df.iloc[:, 0].mean()
-        #st.write(f"Mean of first column: {mean_value}")
-
-        #Create and display plot
-        fig = create_plot(results)
-        st.pyplot(fig)
+        try:
+            st.dataframe(results, hide_index = True)
+            
+            if abs(np.float64(results['Temperature (C)']).mean()-temperature)>0.1 :
+                print(f"Temperature Control was not correct and the value considered is the test temperature not the intended temperature of {info[2][4]}.")
+                temperature = np.float64(results['Temperature (C)']).mean()
+            
+            allresults.loc[len(allresults)] = [temperature,
+                                               model.coefficients[2],
+                                               model.coefficients[1],
+                                               model.coefficients[0],
+                                               10**(model(np.log10(60))),
+                                               abs(2*model.coefficients[0]*np.log10(60)+model.coefficients[1])]
+            
+            
+            # Calculate and display the mean of the first column
+            #mean_value = df.iloc[:, 0].mean()
+            #st.write(f"Mean of first column: {mean_value}")
+    
+            #Create and display plot
+            fig = create_plot(results)
+            st.pyplot(fig)
+        except:
+            st.write("There was an error reading the file.")
         
 
 
@@ -598,5 +602,6 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
