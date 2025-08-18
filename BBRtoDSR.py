@@ -155,7 +155,7 @@ st.sidebar.write("""
 """)
 
 st.sidebar.markdown("""---""")
-st.sidebar.subheader("Important Information ⚠")
+st.sidebar.subheader("⚠ Important Information")
 # Add some descriptive text in the sidebar
 st.sidebar.write("""
     Please exercise caution when using the results, 
@@ -185,7 +185,7 @@ st.sidebar.markdown("""---""")
 
 
 # Add a footer or additional text
-st.sidebar.markdown("### Contact Me ✉")
+st.sidebar.markdown("###✉ Contact Me")
 st.sidebar.write("For more information, please reach out to me at: [koorosh.naderi@colas.com](mailto:koorosh.naderi@colas.com)")
 
 st.sidebar.markdown("""
@@ -623,6 +623,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
