@@ -163,7 +163,7 @@ st.sidebar.write("""
     Additionally, several assumptions have been made, 
     including Arrhenius-type temperature dependence, 
     the validity of [Generalized Power Law behavior for creep compliance at low temperatures](https://www.fhwa.dot.gov/publications/research/infrastructure/pavements/ltpp/10035/009.cfm), 
-    the incompressibility of binder (with a Poisson's ratio of 0.5), 
+    the temperature and frequency independence of Poisson's ratio, 
     and the applicability of the [Christensen–Anderson (CA) model](https://doi.org/10.1080/14680629.2016.1267448) for complex modulus and phase angle master curves. 
     These assumptions may significantly deviate from the true behavior of the material!
 """)
@@ -184,7 +184,7 @@ poissons_ratio = st.sidebar.slider(
     min_value=0.25,  # Minimum value
     max_value=0.5,   # Maximum value
     value=0.50,      # Default value
-    step=0.01,       # Step value for the slider
+    step=0.05,       # Step value for the slider
     format="%.2f",   # Format the displayed value
     key="narrow_slider",  # Unique key for the slider
     help="Adjust the Poisson's ratio between 0.25 and 0.5"  # Optional help text
@@ -468,7 +468,7 @@ if st.button("Print Results"):
             loss_compliance = (10**result_gpl.x[2]) * math.gamma(1+result_gpl.x[0]) * (reduced_omega)**(-result_gpl.x[0]) * np.sin(result_gpl.x[0] * np.pi/2)
             dynamic_compliance = (storage_compliance**2 + loss_compliance**2)**0.5
             dynamic_modulus = 1/dynamic_compliance
-            dynamic_shear_modulus = dynamic_modulus/(2*(1+0.5))
+            dynamic_shear_modulus = dynamic_modulus/(2*(1+poissons_ratio))
             
             initial_data_CA = [0.1,-3]
             result_CA = minimize(ca_minimize, initial_data_CA)
@@ -627,6 +627,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
