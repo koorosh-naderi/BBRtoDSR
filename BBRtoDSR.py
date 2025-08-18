@@ -169,15 +169,6 @@ st.sidebar.write("""
 """)
 st.sidebar.markdown("""---""")
 
-# Add a slider in the sidebar with a width based on a percentage of the page
-st.sidebar.markdown("""
-    <style>
-    .narrow-slider {
-        width: 50%;  /* Adjust this percentage to change slider width */
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # Add the slider with a custom class for styling
 poissons_ratio = st.sidebar.slider(
     "Select Poisson's Ratio:",
@@ -186,7 +177,6 @@ poissons_ratio = st.sidebar.slider(
     value=0.50,      # Default value
     step=0.05,       # Step value for the slider
     format="%.2f",   # Format the displayed value
-    key="narrow_slider",  # Unique key for the slider
     help="Adjust the Poisson's ratio between 0.25 and 0.5"  # Optional help text
 )
 
@@ -206,6 +196,12 @@ st.sidebar.markdown("""
     padding: 10px;
     width: 500px
 }
+
+.stSlider {
+        width: 80%;  /* Adjust this percentage to change slider width */
+        margin: 0 auto;  /* Center the slider */
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -627,6 +623,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
