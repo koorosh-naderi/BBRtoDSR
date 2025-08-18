@@ -18,7 +18,7 @@ import math
 
 # Function to create plots
 def create_plot(data):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(dpi=600)
     ax.plot(data.iloc[:, 0], data.iloc[:, -3],label='Estimated', linestyle='-')
     ax.plot(data.iloc[:, 0], data.iloc[:, -6],label='Measured', linestyle=':', marker='o')
     ax.set_title('Plot of Stiffness vs Time')
@@ -602,6 +602,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
