@@ -9,6 +9,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from scipy import stats
 from scipy.optimize import minimize
 from statistics import linear_regression
@@ -673,6 +674,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
