@@ -13,7 +13,8 @@ from scipy import stats
 from scipy.optimize import minimize
 from statistics import linear_regression
 import math
-#import os
+import tempfile
+import os
 #import csv
 
 # Function to create plots
@@ -672,6 +673,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
