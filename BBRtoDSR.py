@@ -656,12 +656,12 @@ if st.button("Print Results"):
             
             ani = animation.FuncAnimation(fig9, animate, init_func=init, frames=100, interval=5, blit=True)
 
-            writer = FFMpegWriter(fps=30,
+            writer = FFMpegWriter(fps=25,
                       metadata=dict(artist='Your Name'),
                       codec='libx264',
                       extra_args=['-pix_fmt', 'yuv420p'])
 
-            ani.save(fname, writer=writer, dpi=150)
+            ani.save(fname, writer=writer, dpi=200)
         
             plt.close(fig9)
             
@@ -681,6 +681,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
