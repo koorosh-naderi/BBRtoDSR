@@ -611,7 +611,56 @@ if st.button("Print Results"):
             ax8.legend(handles8, labels8)
             st.pyplot(fig8)
 
+
+
+            st.markdown("""---""")
+            st.subheader(f"**Animated Master Curve Shifting**")
+
+            fig9, ax9 = plt.subplots()
+            ax9.set_yscale('log')
             
+            movingshifts = np.insert(np.cumsum(a_T_list),0,0)
+            movingtime = np.array(np.log10([8, 15, 30, 60, 120, 240]))
+            
+            lines = [ax9.plot([], [], label=f'T = {round(tem,2)} °C', antialiased=True, alpha = 0.4, linewidth = 5)[0] for tem in allresults['Temperature (C)']]
+            
+            # Initialization function
+            def init():
+                for line in lines:
+                    line.set_data([], [])
+                return lines
+                
+            # Animation function
+            def animate(i):
+                for idx, shift in enumerate(movingshifts):
+                    shifted_time = movingtime - (0.01 * i * shift)
+                    mod = stiffness(allresults['Temperature (C)'][idx]).iloc[0,:]
+                    lines[idx].set_data(shifted_time, mod)
+                return lines
+
+            ax9.set_title('Plot of Stiffness Mastercurve vs Reduced Time')
+            ax9.set_xlabel('Log Time (s)')
+            ax9.set_ylabel('Stiffness (MPa)')
+            handles9, labels9 = ax9.get_legend_handles_labels()
+            ax9.legend(handles9, labels9)
+            
+            ax9.set_xlim(round(movingtime.min()-movingshifts.max(),0)-1, round(movingtime.max(),0)+1)
+            ax9.set_ylim(10**(round(np.log10(stiffness(allresults['Temperature (C)'][0]).iloc[0,:].min()),0)-1), 
+                         10**(round(np.log10(stiffness(allresults['Temperature (C)'][0]).iloc[0,:].max()),0)+1))
+
+            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as fp:
+                fname = fp.name
+            
+            ani = animation.FuncAnimation(fig9, animate, init_func=init, frames=100, interval=5, blit=True)
+            
+            ani.save(fname, writer="ffmpeg",fps=30, dpi=150)
+            plt.close(fig9)
+            
+            with open(fname, "rb") as f:
+                video_bytes = f.read()
+            os.remove(fname)  # Clean up       
+            
+            st.video(video_bytes)
 
         
     
@@ -623,6 +672,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
