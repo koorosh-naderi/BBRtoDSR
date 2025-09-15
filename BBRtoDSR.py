@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib.animation import FFMpegWriter
 from scipy import stats
 from scipy.optimize import minimize
 from statistics import linear_regression
@@ -654,8 +655,14 @@ if st.button("Print Results"):
                 fname = fp.name
             
             ani = animation.FuncAnimation(fig9, animate, init_func=init, frames=100, interval=5, blit=True)
-            
-            ani.save(fname, writer="ffmpeg",fps=30, dpi=150)
+
+            writer = FFMpegWriter(fps=30,
+                      metadata=dict(artist='Your Name'),
+                      codec='libx264',
+                      extra_args=['-pix_fmt', 'yuv420p'])
+
+            ani.save(fname, writer=writer, dpi=150)
+        
             plt.close(fig9)
             
             with open(fname, "rb") as f:
@@ -674,6 +681,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
