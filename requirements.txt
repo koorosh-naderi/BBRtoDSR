@@ -1,6 +1,6 @@
+ffmpeg-python
 numpy
 pandas
 matplotlib
 streamlit
 scipy
-ffmpeg
