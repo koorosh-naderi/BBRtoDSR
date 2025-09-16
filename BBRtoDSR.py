@@ -488,8 +488,11 @@ if st.button("Print Results"):
             newphase_CA = 90/(1+(newomega/(10**result_CA.x[1]))**result_CA.x[0])
             
             st.write(f"**β: {round(result_CA.x[0],3)}**")
-            st.write(f"**log$ω_{'C'}$: {round(result_CA.x[1],3)}**")
+            st.write(f"**log$ω_{'C'}$: {round(result_CA.x[1],3)} at $T_{{{"ref"}}}$**")
+        
+            logomega_C_zero = np.log10((10**result_CA.x[1])*(10**(slope4*(1/(0+273.15)-1/(273.15+allresults['Temperature (C)'][0])))))
 
+            st.write(f"**log$ω_{'C'}$: {round(logomega_C_zero,3)} at 0°C**")
                         
             fig5, ax5 = plt.subplots()
             ax5.plot(reduced_omega, dynamic_shear_modulus,label='Master Curve', 
@@ -699,6 +702,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
