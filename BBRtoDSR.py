@@ -161,7 +161,8 @@ st.sidebar.markdown("""---""")
 st.sidebar.subheader("⚠ Important Information")
 # Add some descriptive text in the sidebar
 st.sidebar.write("""
-    Please exercise caution when using the results, 
+    Before use, please ensure that the BBR data are accurate and reproducible.
+    Please exercise caution when using the results of this tool, 
     as this method attempts to extrapolate the Bending Beam Rheometer results beyond the ranges measured by the device. 
     Additionally, several assumptions have been made, 
     including Arrhenius-type temperature dependence, 
@@ -698,6 +699,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
