@@ -603,7 +603,7 @@ if st.button("Print Results"):
 
 
             st.markdown("""---""")
-            st.subheader(f"**Pavel-Kriz Phase Angle, [Detection of Phase Incompatible Binders](https://www.asphaltinstitute.org/engineering/specification-databases/changes-to-criterion-after-pav-aging/)**")
+            st.subheader(f"**Pavel-Kriz Phase Angle, [Detection of Phase Incompatible Binders](https://trid.trb.org/View/2344464/)**")
 
             initial_data_T_pavel_kriz = [22]
             result_T_pavel_kriz = minimize(T_pavel_kriz, initial_data_T_pavel_kriz)
@@ -702,6 +702,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
