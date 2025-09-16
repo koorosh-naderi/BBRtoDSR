@@ -574,7 +574,7 @@ if st.button("Print Results"):
                      linestyle='None',
                      marker='o', alpha=0.7, markersize=2, c='red')
             ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 5000 kPa',linestyle='--',marker='None',c='black')
-            ax7.plot(np.arange(1,89,1),6000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 6000 kPa',linestyle='-.',marker='None',c='black')
+            ax7.plot(np.arange(1,89,1),6000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 6000 kPa',linestyle='-.',marker='None',c='black',alpha=0.6)
             ax7.set_title('Black Diagram')
             ax7.set_xlabel('Phase Angle (°)')
             ax7.set_ylabel('G* (kPa)')
@@ -688,6 +688,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
