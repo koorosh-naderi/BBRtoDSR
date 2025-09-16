@@ -390,7 +390,7 @@ if st.button("Print Results"):
             Trans_temp = np.array([1/(273.15 + x)-1/(273.15+Temperature_list[0]) for x in Temperature_list])
             logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
             
-            slope4, intercept4 = linear_regression(Trans_temp, logaT_arr, proportional=True)
+            slope4, intercept4, rvalue4 = linear_regression(Trans_temp, logaT_arr, proportional=True)
             
             fig4, ax4 = plt.subplots()
             ax4.plot(np.array(Temperature_list), 10**logaT_arr, label='Shift Factors', 
@@ -404,6 +404,7 @@ if st.button("Print Results"):
             ax4.set_ylabel('Shift Factor')
             ax4.set_yscale('log')
             plt.figtext(0.50, 0.60, f'ln$a_{"T"}$ = ($E_{"a"}$/R)(1/$T$-1/$T_{{{"ref"}}}$)' )
+            plt.figtext(0.50, 0.40, f'r2 = {rvalue4**2}' )
             handles4, labels4 = ax4.get_legend_handles_labels()
             ax4.legend(handles4, labels4)
             st.pyplot(fig4)
@@ -688,6 +689,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
