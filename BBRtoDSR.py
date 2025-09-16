@@ -410,8 +410,9 @@ if st.button("Print Results"):
             ax4.set_xlabel('Temperature (°C)')
             ax4.set_ylabel('Shift Factor')
             ax4.set_yscale('log')
+        
             plt.figtext(0.50, 0.60, f'ln$a_{"T"}$ = ($E_{"a"}$/R)(1/$T$-1/$T_{{{"ref"}}}$)' )
-            plt.figtext(0.50, 0.40, f'r2 = {r_squared_Arrhenius}' )
+            plt.figtext(0.50, 0.55, f'$R^{2}$ = {round(r_squared_Arrhenius,3)}' )
         
             handles4, labels4 = ax4.get_legend_handles_labels()
             ax4.legend(handles4, labels4)
@@ -697,6 +698,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
