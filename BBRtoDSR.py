@@ -504,7 +504,7 @@ if st.button("Print Results"):
 
         
             omega_GR = 0.005
-            omega_GR_reduced = 0.005 * 10**(slope4*(1/(15+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+            omega_GR_reduced = omega_GR * 10**(slope4*(1/(15+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
             phase_GR = 90/(1+(omega_GR_reduced/(10**result_CA.x[1]))**result_CA.x[0])
             G_GR = 1000*1000*(1+(10**result_CA.x[1]/omega_GR_reduced)**result_CA.x[0])**(-1/result_CA.x[0])
             
@@ -547,6 +547,12 @@ if st.button("Print Results"):
 
             st.write(f"**$T_{{{'G"=6000kPa'}}}$: {round(result_T_fatigue_6000.x[0],1)} °C**")
 
+            omega_fatigue6_superpave = 10
+            omega_fatigue6_superpave_reduced = omega_fatigue6_superpave * 10**(slope4*(1/(result_T_fatigue_6000.x[0]+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+            phase_fatigue6 = 90/(1+(omega_fatigue6_superpave_reduced/(10**result_CA.x[1]))**result_CA.x[0])
+
+            st.write(f"**$δ_{{{'G"=6000kPa'}}}$: {round(phase_fatigue6,1)} °**")
+        
             Temperature_fatigue_list = np.array([4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 40])
             Omega_fatigue_list = 10 * 10**(slope4*(1/(Temperature_fatigue_list+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
             phase_fatigue_list = 90/(1+(Omega_fatigue_list/(10**result_CA.x[1]))**result_CA.x[0])
@@ -681,6 +687,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
