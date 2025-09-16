@@ -391,7 +391,14 @@ if st.button("Print Results"):
             logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
             
             slope4, intercept4 = linear_regression(Trans_temp, logaT_arr, proportional=True)
+
+            predicted_logaT_arr = [slope4 * xi + intercept4 for xi in Trans_temp]
             
+            rss = sum((yi - y_pred) ** 2 for yi, y_pred in zip(logaT_arr, predicted_logaT_arr))
+            mean_y = sum(logaT_arr) / len(logaT_arr)
+            tss = sum((yi - mean_y) ** 2 for yi in logaT_arr)
+            r_squared_Arrhenius = 1 - rss / tss
+
             fig4, ax4 = plt.subplots()
             ax4.plot(np.array(Temperature_list), 10**logaT_arr, label='Shift Factors', 
                      linestyle='None',
@@ -404,7 +411,8 @@ if st.button("Print Results"):
             ax4.set_ylabel('Shift Factor')
             ax4.set_yscale('log')
             plt.figtext(0.50, 0.60, f'ln$a_{"T"}$ = ($E_{"a"}$/R)(1/$T$-1/$T_{{{"ref"}}}$)' )
-            
+            plt.figtext(0.50, 0.40, f'r2 = {r_squared_Arrhenius}' )
+        
             handles4, labels4 = ax4.get_legend_handles_labels()
             ax4.legend(handles4, labels4)
             st.pyplot(fig4)
@@ -689,6 +697,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
