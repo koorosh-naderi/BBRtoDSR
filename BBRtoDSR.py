@@ -422,6 +422,8 @@ if st.button("Print Results"):
             st.write(f"**$E_{'a'}$: {round(slope4*np.log(10)*8.314462618/1000,3)} kJ/mol**")
             st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$**")
             st.write(f"**Please note that the temperature is converted to Kelvin, and 'ln' in the function refers to the natural logarithm.**")
+            st.write(f"**An $r^{2}$ value below 0.98 raises concerns and warrants rechecking the BBR test data.**")
+        
             
             st.markdown("""---""")
             
@@ -702,6 +704,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
