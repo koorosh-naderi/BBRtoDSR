@@ -546,9 +546,8 @@ if st.button("Print Results"):
             ax6.legend(handles6, labels6)
             st.pyplot(fig6)
 
-
-
-
+            st.write(f"**The Glover-Rowe parameter, which is based on the DSR Fn proposed by Glover, was originally developed to relate dynamic rheological properties in shear mode to tensile failure strain (ductility) in tension mode for pure or unmodified bitumen (asphalt binder). 
+                        If the tested sample is modified, however, care should be taken, as high G-R values do not necessarily correlate with low ductility values.**")
         
             st.markdown("""---""")
 
@@ -704,6 +703,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
