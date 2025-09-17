@@ -151,7 +151,7 @@ st.logo(
 
 
 # Create a sidebar
-st.sidebar.header("🖳 BBRtoDSR")
+st.sidebar.header("⌨ BBRtoDSR")
 st.sidebar.write("""
     This app reads CSV files from Bending Beam Rheometer tests and attempts to transform the data into dynamic shear results typically obtained from a Dynamic Shear Rheometer device. 
     By applying various rheological models and functions, it calculates different rheological parameters and indices.
@@ -702,6 +702,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
