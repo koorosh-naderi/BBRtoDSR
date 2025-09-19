@@ -198,7 +198,7 @@ st.sidebar.markdown("""
     background-color: #f0f0f0;
     border-radius: 5px;
     padding: 10px;
-    width: 700px
+    width: 650px
 }
 
 .stSlider {
@@ -702,6 +702,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
