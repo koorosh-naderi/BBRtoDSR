@@ -501,7 +501,7 @@ if st.button("Print Results"):
                      linestyle='None',
                      marker='o')
             ax5.plot(newomega,newG_CA,label='CA Model',linestyle='-',marker='None')
-            ax5.set_title('Plot of G* vs Reduced Angular Frequency')
+            ax5.set_title('Plot of |G*| vs Reduced Angular Frequency')
             ax5.set_xlabel('ω (Rad/s)')
             ax5.set_ylabel('|G*| (MPa)')
             ax5.set_xscale('log')
@@ -574,7 +574,7 @@ if st.button("Print Results"):
             G_storage_fatigue_list = G_fatigue_list * np.cos(np.radians(phase_fatigue_list))
             G_loss_fatigue_list = G_fatigue_list * np.sin(np.radians(phase_fatigue_list))
             
-            fatigue_list = pd.DataFrame(columns=['Temperature (°C)','Phase Angle (°)','G* (kPa)',"G' (kPa)",'G" (kPa)'])
+            fatigue_list = pd.DataFrame(columns=['Temperature (°C)','Phase Angle (°)','|G*| (kPa)',"G' (kPa)",'G" (kPa)'])
             fatigue_list['Temperature (°C)'] = Temperature_fatigue_list
             fatigue_list['Phase Angle (°)'] = np.round(phase_fatigue_list,1)
             fatigue_list['|G*| (kPa)'] = np.round(G_fatigue_list,0)
@@ -702,6 +702,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
