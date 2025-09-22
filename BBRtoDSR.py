@@ -503,10 +503,10 @@ if st.button("Print Results"):
             ax5.plot(newomega,newG_CA,label='CA Model',linestyle='-',marker='None')
             ax5.set_title('Plot of G* vs Reduced Angular Frequency')
             ax5.set_xlabel('ω (Rad/s)')
-            ax5.set_ylabel('G* (MPa)')
+            ax5.set_ylabel('|G*| (MPa)')
             ax5.set_xscale('log')
             ax5.set_yscale('log')
-            plt.figtext(0.20, 0.60, f'G* = $G_{"g"}$[1+($ω_{"C"}$/ω$)^{"β"}$$]^{{{"(-1/β)"}}}$')
+            plt.figtext(0.20, 0.60, f'|G*| = $G_{"g"}$[1+($ω_{"C"}$/ω$)^{"β"}$$]^{{{"(-1/β)"}}}$')
             handles5, labels5 = ax5.get_legend_handles_labels()
             ax5.legend(handles5, labels5)
             st.pyplot(fig5)
@@ -527,7 +527,7 @@ if st.button("Print Results"):
             G_R = (G_GR/(np.sin(np.radians(phase_GR))))*(np.cos(np.radians(phase_GR)))**2
 
             st.write(f"**$G-R$: {round(G_R,0)} kPa**")
-            st.write(f"**$G^{'*'}_{{{'G-R'}}}$: {round(G_GR,0)} kPa**")
+            st.write(f"**$|G^{'*'}|_{{{'G-R'}}}$: {round(G_GR,0)} kPa**")
             st.write(f"**$δ_{{{'G-R'}}}$: {round(phase_GR,0)} °**")
 
             fig6, ax6 = plt.subplots()
@@ -538,7 +538,7 @@ if st.button("Print Results"):
             ax6.plot(np.arange(1,89,1),600*np.sin(np.radians(np.arange(1,89,1)))/np.cos(np.radians(np.arange(1,89,1)))**2,label='G-R = 600 kPa',linestyle='-',marker='None',c='red')
             ax6.set_title('Black Diagram')
             ax6.set_xlabel('Phase Angle (°)')
-            ax6.set_ylabel('G* (kPa)')
+            ax6.set_ylabel('|G*| (kPa)')
             ax6.set_yscale('log')
             ax6.set_ylim(top=1e6)
             ax6.set_xlim(0,90)
@@ -577,7 +577,7 @@ if st.button("Print Results"):
             fatigue_list = pd.DataFrame(columns=['Temperature (°C)','Phase Angle (°)','G* (kPa)',"G' (kPa)",'G" (kPa)'])
             fatigue_list['Temperature (°C)'] = Temperature_fatigue_list
             fatigue_list['Phase Angle (°)'] = np.round(phase_fatigue_list,1)
-            fatigue_list['G* (kPa)'] = np.round(G_fatigue_list,0)
+            fatigue_list['|G*| (kPa)'] = np.round(G_fatigue_list,0)
             fatigue_list["G' (kPa)"] = np.round(G_storage_fatigue_list,0)
             fatigue_list['G" (kPa)'] = np.round(G_loss_fatigue_list,0)
 
@@ -587,11 +587,11 @@ if st.button("Print Results"):
             ax7.plot(phase_fatigue_list, G_fatigue_list, label='Superpave Fatigue Points, ω = 10 Rad/s', 
                      linestyle='None',
                      marker='o', alpha=0.7, markersize=2, c='red')
-            ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 5000 kPa',linestyle='--',marker='None',c='black')
-            ax7.plot(np.arange(1,89,1),6000/np.sin(np.radians(np.arange(1,89,1))),label='G*sinδ = 6000 kPa',linestyle='-.',marker='None',c='black',alpha=0.3)
+            ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='|G*|sinδ = 5000 kPa',linestyle='--',marker='None',c='black')
+            ax7.plot(np.arange(1,89,1),6000/np.sin(np.radians(np.arange(1,89,1))),label='|G*|sinδ = 6000 kPa',linestyle='-.',marker='None',c='black',alpha=0.3)
             ax7.set_title('Black Diagram')
             ax7.set_xlabel('Phase Angle (°)')
-            ax7.set_ylabel('G* (kPa)')
+            ax7.set_ylabel('|G*| (kPa)')
             ax7.set_yscale('log')
             ax7.set_ylim(1,1e6)
             ax7.set_xlim(0,90)
@@ -613,7 +613,7 @@ if st.button("Print Results"):
 
             st.write(f"ω = 10 Rad/s")
             st.write(f"T = {round(result_T_pavel_kriz.x[0],1)} °C")
-            st.write(f"**$δ_{{{'G*=8967kPa'}}}$: {round(phase_pavel_kriz,1)} °**")
+            st.write(f"**$δ_{{{'|G*|=8967kPa'}}}$: {round(phase_pavel_kriz,1)} °**")
 
 
             fig8, ax8 = plt.subplots()
@@ -627,7 +627,7 @@ if st.button("Print Results"):
             ax8.hlines(y=8967,xmin=0,xmax=90,linestyle='dashdot',colors='black')
             ax8.set_title('Black Diagram')
             ax8.set_xlabel('Phase Angle (°)')
-            ax8.set_ylabel('G* (kPa)')
+            ax8.set_ylabel('|G*| (kPa)')
             ax8.set_yscale('log')
             ax8.set_ylim(1,1e6)
             ax8.set_xlim(0,90)
@@ -702,6 +702,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
