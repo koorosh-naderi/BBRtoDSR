@@ -691,6 +691,8 @@ if st.button("Print Results"):
             os.remove(fname)  # Clean up       
             
             st.video(video_bytes)
+    else:
+        st.write("Upload a minimum of two CSV files for further analysis.")
 
         
     
@@ -702,6 +704,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
