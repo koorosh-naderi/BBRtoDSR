@@ -211,14 +211,14 @@ st.sidebar.markdown("""
 
 st.image("BBRtoDSRv1.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
-st.write("A minimum of two CSV files is required for analysis. Please note that only CSV files from Cannon® Instrument Company can be read by the app (BBRw versions 1.34 and 1.35 were tested).")
+st.write("A minimum of two CSV (XLSM) files is required for analysis. Please note that only CSV files from Cannon® Instrument Company can be read by the app (BBRw versions 1.34 and 1.35 were tested). XLSM files from Universal Test Module 2.3.0.5 from VTS has also been tested.")
 
 # Session state to track uploaded files
 if 'uploaded_files' not in st.session_state:
     st.session_state.uploaded_files = []
 
 # File uploader
-uploaded_files = st.file_uploader("Choose CSV files", accept_multiple_files=True, type='csv')
+uploaded_files = st.file_uploader("Choose files (CSV or XLSM)", accept_multiple_files=True, type=['csv', 'xlsm'])
 
 # If new files are uploaded, clear previous analysis
 if uploaded_files:
@@ -233,96 +233,148 @@ allresults = pd.DataFrame(columns=['Temperature (C)','A','B','C','S(60)','m-valu
 
 # Perform analysis if there are uploaded files
 if st.session_state.uploaded_files:
-    dataframes = []
+    
     for uploaded_file in uploaded_files:
-        num_lines = count_lines(uploaded_file)
-        if num_lines>44:
-            try:
-                df = pd.read_csv(uploaded_file,
-                    header=None,engine='python',names=range(1,6))
+        file_type = uploaded_file.name.split('.')[-1].lower()
+        if file_type == 'csv':
+            num_lines = count_lines(uploaded_file)
+            if num_lines>44:
+                try:
+                    df = pd.read_csv(uploaded_file,
+                        header=None,engine='python',names=range(1,6))
+                
+                    info = df.iloc[0:9,0:2]
+                    data = df.iloc[9:,:].dropna(axis=1)
+                    data.columns = data.iloc[0]
+                    data = data[1:]
+                    data.reset_index(drop=True,inplace=True)
+                    data = data.rename_axis(None, axis=1)
+                    BeamSpan = np.float64(info[2][6])/1000
+                    BeamWidth = np.float64(info[2][7])/1000
+                    BeamThickness = np.float64(info[2][8])/1000
+                    data['Stiffness (MPa)'] = 1/1000000*(np.float64(data['Force (mN)'])*BeamSpan**3)/(np.float64(data['Deflection (mm)'])*4*BeamWidth*BeamThickness**3)
+                    data['log(t)'] = np.log10(np.float64(data['Time (s)']))
+                    data['log(S)'] = np.log10(data['Stiffness (MPa)'])
+                
+                    results = data[data['Time (s)'].isin(['8','15','30','60','120','240'])]
+                    model = np.poly1d(np.polyfit(results['log(t)'], results['log(S)'], 2))
+                
+                    data['Sc (MPa)'] = 10**model(np.float64(data['log(t)']))
+                    data['Percent diff'] = (data['Stiffness (MPa)']-data['Sc (MPa)'])/data['Stiffness (MPa)']*100
+                    data['m-value'] = abs(2*model.coefficients[0]*data['log(t)']+model.coefficients[1])
+                    
+                    results = data[data['Time (s)'].isin(['8','15','30','60','120','240'])]
+                    temperature = np.float64(info[2][4])
+                except:
+                    st.error("The file is not compatible. num_lines>44")
             
-                info = df.iloc[0:9,0:2]
-                data = df.iloc[9:,:].dropna(axis=1)
-                data.columns = data.iloc[0]
-                data = data[1:]
-                data.reset_index(drop=True,inplace=True)
-                data = data.rename_axis(None, axis=1)
-                BeamSpan = np.float64(info[2][6])/1000
-                BeamWidth = np.float64(info[2][7])/1000
-                BeamThickness = np.float64(info[2][8])/1000
+            elif num_lines==44:
+                
+                try:
+                    df = pd.read_csv(uploaded_file, header=None,engine='python', encoding='unicode_escape',skiprows=38)
+                    uploaded_file.seek(0)
+                    dfhead = pd.read_csv(uploaded_file,header=None,engine='python', encoding='unicode_escape',nrows=36,index_col=False)
+                    
+                    data = pd.DataFrame()
+                    data['Time (s)'] = df[0]
+                    data['Force (mN)'] = df[1]
+                    data['Deflection (mm)'] = df[2]
+                    data['Temperature (C)'] = dfhead.iloc[6,1]
+                    data['Stiffness (MPa)'] = df[3]
+                    data['log(t)'] = np.log10(np.float64(data['Time (s)']))
+                    data['log(S)'] = np.log10(data['Stiffness (MPa)'])
+                    data['Sc (MPa)'] = df[4]
+                    data['Percent diff'] = (data['Stiffness (MPa)']-data['Sc (MPa)'])/data['Stiffness (MPa)']*100
+                    data['m-value'] = df[6]
+                    results = data
+                    model = np.poly1d(np.polyfit(results['log(t)'], results['log(S)'], 2))
+                    temperature = np.float64(dfhead.iloc[6,1])
+                except:
+                    st.error("The file is not compatible. num_lines=44")
+            else:
+                st.error("The file is not compatible. num_lines not number")
+            
+            
+            # Display the uploaded dataframe
+            st.write(f"**Data from {uploaded_file.name}:**")
+            
+            try:
+                st.dataframe(results, hide_index = True)
+                
+                if abs(np.float64(results['Temperature (C)']).mean()-temperature)>0.1 :
+                    st.write(f"Temperature Control was not correct and the value considered is the test temperature not the intended temperature of {info[2][4]}.")
+                    temperature = np.float64(results['Temperature (C)']).mean()
+                
+                allresults.loc[len(allresults)] = [temperature,
+                                                   model.coefficients[2],
+                                                   model.coefficients[1],
+                                                   model.coefficients[0],
+                                                   10**(model(np.log10(60))),
+                                                   abs(2*model.coefficients[0]*np.log10(60)+model.coefficients[1])]
+                fig = create_plot(results)
+                st.pyplot(fig)
+            except:
+                st.write("There was an error reading the file.")
+        
+        elif file_type == 'xlsm':    
+            # XLSM handling
+            sheet_name = 'BBR Results'
+            start_row = 100
+            
+            try:
+                df = pd.read_excel(uploaded_file, sheet_name=sheet_name, engine="openpyxl", skiprows=start_row-1,header=None)
+                full_sheet = pd.read_excel(uploaded_file, sheet_name=sheet_name, engine="openpyxl", header=None)
+                    
+                data = pd.DataFrame()
+                data['Time (s)'] = df[0]
+                data['Force (mN)'] = df[1]*1000
+                data['Deflection (mm)'] = df[2]
+                data['Temperature (C)'] = df[3]
+                
+                BeamSpan = np.float64(full_sheet.iloc[29,2])/1000
+                BeamWidth = np.float64(full_sheet.iloc[19,8])/1000
+                BeamThickness = np.float64(full_sheet.iloc[20,8])/1000
+                temperature = np.float64(full_sheet.iloc[28,2])
+                
                 data['Stiffness (MPa)'] = 1/1000000*(np.float64(data['Force (mN)'])*BeamSpan**3)/(np.float64(data['Deflection (mm)'])*4*BeamWidth*BeamThickness**3)
                 data['log(t)'] = np.log10(np.float64(data['Time (s)']))
                 data['log(S)'] = np.log10(data['Stiffness (MPa)'])
             
-                results = data[data['Time (s)'].isin(['8','15','30','60','120','240'])]
+                results = data[data['Time (s)'].isin([8,15,30,60,120,240])]
                 model = np.poly1d(np.polyfit(results['log(t)'], results['log(S)'], 2))
             
                 data['Sc (MPa)'] = 10**model(np.float64(data['log(t)']))
                 data['Percent diff'] = (data['Stiffness (MPa)']-data['Sc (MPa)'])/data['Stiffness (MPa)']*100
                 data['m-value'] = abs(2*model.coefficients[0]*data['log(t)']+model.coefficients[1])
                 
-                results = data[data['Time (s)'].isin(['8','15','30','60','120','240'])]
-                temperature = np.float64(info[2][4])
-            except:
-                st.error("The file is not compatible.")
-        
-        elif num_lines==44:
+                results = data[data['Time (s)'].isin([8,15,30,60,120,240])]
+                
+                
+            except Exception as e:
+                st.error(f"Error reading XLSM file: {e}")
+            
+            # Display the uploaded dataframe
+            st.write(f"**Data from {uploaded_file.name}:**")
             
             try:
-                df = pd.read_csv(uploaded_file, header=None,engine='python', encoding='unicode_escape',skiprows=38)
-                uploaded_file.seek(0)
-                dfhead = pd.read_csv(uploaded_file,header=None,engine='python', encoding='unicode_escape',nrows=36,index_col=False)
+                st.dataframe(results, hide_index = True)
                 
-                data = pd.DataFrame()
-                data['Time (s)'] = df[0]
-                data['Force (mN)'] = df[1]
-                data['Deflection (mm)'] = df[2]
-                data['Temperature (C)'] = dfhead.iloc[6,1]
-                data['Stiffness (MPa)'] = df[3]
-                data['log(t)'] = np.log10(np.float64(data['Time (s)']))
-                data['log(S)'] = np.log10(data['Stiffness (MPa)'])
-                data['Sc (MPa)'] = df[4]
-                data['Percent diff'] = (data['Stiffness (MPa)']-data['Sc (MPa)'])/data['Stiffness (MPa)']*100
-                data['m-value'] = df[6]
-                results = data
-                model = np.poly1d(np.polyfit(results['log(t)'], results['log(S)'], 2))
-                temperature = np.float64(dfhead.iloc[6,1])
+                if abs(np.float64(results['Temperature (C)']).mean()-temperature)>0.1 :
+                    st.write(f"Temperature Control was not correct and the value considered is the test temperature not the intended temperature of {full_sheet.iloc[28,2]}.")
+                    temperature = np.float64(results['Temperature (C)']).mean()
+                
+                allresults.loc[len(allresults)] = [temperature,
+                                                   model.coefficients[2],
+                                                   model.coefficients[1],
+                                                   model.coefficients[0],
+                                                   10**(model(np.log10(60))),
+                                                   abs(2*model.coefficients[0]*np.log10(60)+model.coefficients[1])]
+                fig = create_plot(results)
+                st.pyplot(fig)
             except:
-                st.error("The file is not compatible.")
+                st.write("There was an error reading the file.")
         else:
-            st.error("The file is not compatible.")
-
-        # Display the uploaded dataframe
-        st.write(f"**Data from {uploaded_file.name}:**")
-        
-        try:
-            st.dataframe(results, hide_index = True)
-            
-            if abs(np.float64(results['Temperature (C)']).mean()-temperature)>0.1 :
-                print(f"Temperature Control was not correct and the value considered is the test temperature not the intended temperature of {info[2][4]}.")
-                temperature = np.float64(results['Temperature (C)']).mean()
-            
-            allresults.loc[len(allresults)] = [temperature,
-                                               model.coefficients[2],
-                                               model.coefficients[1],
-                                               model.coefficients[0],
-                                               10**(model(np.log10(60))),
-                                               abs(2*model.coefficients[0]*np.log10(60)+model.coefficients[1])]
-            
-            
-            # Calculate and display the mean of the first column
-            #mean_value = df.iloc[:, 0].mean()
-            #st.write(f"Mean of first column: {mean_value}")
-    
-            #Create and display plot
-            fig = create_plot(results)
-            st.pyplot(fig)
-        except:
-            st.write("There was an error reading the file.")
-        
-
-
-     
+            st.error("Unsupported file type") 
 
     #
 if st.button("Print Results"):
@@ -333,8 +385,6 @@ if st.button("Print Results"):
                                         ascending=False,inplace=True)
     allresults.reset_index(drop=True, inplace=True)
     st.dataframe(allresults , hide_index = True)
-    
-    
     
     if len(allresults)>=2:
             
@@ -693,17 +743,10 @@ if st.button("Print Results"):
             st.video(video_bytes)
     else:
         st.write("Upload a minimum of two CSV files for further analysis.")
-
-        
-    
-    
-    
-    
-    
-    
     
     
     # This can be modified to save to a file
+
 
 
 
