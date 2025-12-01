@@ -212,7 +212,7 @@ st.sidebar.markdown("""
 st.image("BBRtoDSRv1.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
 st.write("""A minimum of two CSV (XLSM) files is required for analysis. Please note that only CSV files from Cannon® Instrument Company can be read by the app (BBRw versions 1.34 and 1.35 were tested). 
-XLSM files from Universal Test Module 2.3.0.5 from PaveTest® has also been tested.""")
+XLSM files from Universal Test Module 2.3.0.5 from PaveTest® have also been tested.""")
 
 # Session state to track uploaded files
 if 'uploaded_files' not in st.session_state:
@@ -747,6 +747,7 @@ if st.button("Print Results"):
     
     
     # This can be modified to save to a file
+
 
 
 
