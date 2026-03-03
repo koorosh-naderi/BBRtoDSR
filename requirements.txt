@@ -2,6 +2,7 @@ ffmpeg-python
 numpy
 pandas
 matplotlib
-streamlit
+streamlit>=1.52.0
 scipy
 openpyxl
+
