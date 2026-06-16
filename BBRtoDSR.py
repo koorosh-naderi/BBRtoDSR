@@ -629,8 +629,8 @@ if st.button("Print Results"):
             fatigue_list['Temperature (°C)'] = Temperature_fatigue_list
             fatigue_list['Phase Angle (°)'] = np.round(phase_fatigue_list,1)
             fatigue_list['|G*| (kPa)'] = np.round(G_fatigue_list,0)
-            fatigue_list["G' (kPa)"] = np.round(G_storage_fatigue_list,0)
-            fatigue_list['G" (kPa)'] = np.round(G_loss_fatigue_list,0)
+            fatigue_list["G'=|G*|cosẟ (kPa)"] = np.round(G_storage_fatigue_list,0)
+            fatigue_list['G"=|G*|sinẟ (kPa)'] = np.round(G_loss_fatigue_list,0)
 
             st.dataframe(fatigue_list, hide_index = True)
 
