@@ -5,6 +5,7 @@ Created on Tue Apr 29 16:42:12 2025
 @author: NADERIK1
 """
 
+#import libraries
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -18,69 +19,63 @@ import math
 import tempfile
 import os
 
+#magic numbers
 BBR_TIMES = np.array([8,15,30,60,120,240])
+LOG_BBR_TIMES = np.log10(BBR_TIMES)
 
 POLY_MATRIX = np.vstack([
     np.ones(len(BBR_TIMES)),
-    np.log10(BBR_TIMES),
-    np.log10(BBR_TIMES)**2
+    LOG_BBR_TIMES,
+    LOG_BBR_TIMES**2
 ])
 
+GAS_CONSTANT = 8.31446261815324
+DEFAULT_GLASSY_MODULUS_MPA = 1000
+KELVIN_OFFSET = 273.15
+M_VALUE_LIMIT = 0.3
+STIFFNESS_LIMIT = 300
+REFERENCE_BBR_TIME = 60
+FATIGUE_LIMIT = 5000
+FATIGUE_LIMIT_ALT = 6000
+PAVEL_KRIZ_MODULUS = 6000 / np.sin(np.deg2rad(42))
+DISPLAY_DPI = 450
 
-#Fit polynomial to BBR data
+def celsius_to_kelvin(temp_c):
+    return temp_c + KELVIN_OFFSET
+
 def fit_bbr_curve(data):
-
     data = data.copy()
-    
     data['Time (s)'] = pd.to_numeric(data['Time (s)'], errors='coerce')
-
     data['log(t)'] = np.log10(
-        np.float64(data['Time (s)'])
-    )
-
+        np.float64(data['Time (s)']))
     data['log(S)'] = np.log10(
-        data['Stiffness (MPa)']
-    )
-    
+        data['Stiffness (MPa)'])
     results = data[
-        data['Time (s)'].isin(
-            BBR_TIMES
-        )
-    ]
-
+    data['Time (s)'].isin(
+            BBR_TIMES)]
     model = np.poly1d(
         np.polyfit(
             results['log(t)'],
             results['log(S)'],
-            2
-        )
-    )
-
+            2))
     data['Sc (MPa)'] = 10**(
-        model(data['log(t)'])
-    )
-
+    model(data['log(t)']))
     data['Percent diff'] = (
         data['Stiffness (MPa)']
         - data['Sc (MPa)']
     ) / data['Stiffness (MPa)'] * 100
-
     data['m-value'] = np.abs(
         2*model.coefficients[0]
         * data['log(t)']
-        + model.coefficients[1]
-    )
-    
+        + model.coefficients[1])
     results = data[data['Time (s)'].isin(BBR_TIMES)]
     return data, results, model
 
-
-
 # Function to create plots
 def create_plot(data):
-    fig, ax = plt.subplots(dpi=900)
-    ax.plot(data.iloc[:, 0], data.iloc[:, -3],label='Estimated', linestyle='-')
-    ax.plot(data.iloc[:, 0], data.iloc[:, -6],label='Measured', linestyle=':', marker='o')
+    fig, ax = plt.subplots(dpi=DISPLAY_DPI)
+    ax.plot(data['Time (s)'], data['Sc (MPa)'],label='Estimated', linestyle='-')
+    ax.plot(data['Time (s)'], data['Stiffness (MPa)'],label='Measured', linestyle=':', marker='o')
     ax.set_title('Plot of Stiffness vs Time')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Stiffness (MPa)')
@@ -90,24 +85,20 @@ def create_plot(data):
     ax.legend(handles, labels)
     return fig
 
-#Bracketing Criteria
 def find_bracketing_rows(df, column_name, target_value):
     # Sort the DataFrame by the specified column
-    df_sorted = df.sort_values(by=column_name)
-    
+    df_sorted = df.sort_values(by=column_name)  
     # Initialize variables for bracketing
     lower_row = None
     upper_row = None
-
     # Iterate through the sorted DataFrame to find bracketing rows
-    for index, row in df_sorted.iterrows():
+    for _, row in df_sorted.iterrows():
         value = row[column_name]
         if value < target_value:
             lower_row = row
         elif value > target_value and upper_row is None:
             upper_row = row
             break
-
     # If both lower and upper rows are found, create a new DataFrame
     if lower_row is not None and upper_row is not None:
         return pd.DataFrame([lower_row, upper_row])
@@ -118,30 +109,36 @@ def find_bracketing_rows(df, column_name, target_value):
         closest_rows = closest_rows.drop(columns='distance')  # Drop the distance column if you don't want it
         return closest_rows
 
-#Calculate Stiffness
 def stiffness(T1, allresults):
+    coeffs = allresults.loc[
+        allresults['Temperature (C)'] == T1,
+        ['A', 'B', 'C']
+    ]
+    return 10**(coeffs @ POLY_MATRIX)
 
-    list1 = allresults[
-        allresults['Temperature (C)'] == T1
-    ].iloc[:,1:4]
-
-    list3 = 10**(list1 @ POLY_MATRIX)
-
-    return list3
-
-#Error function for Shift Factors
 def shift_factor_error(T1, T2, a, allresults):
-    list1 = allresults[allresults['Temperature (C)']==T1].iloc[:,1:4]
-    list2 = allresults[allresults['Temperature (C)']==T2].iloc[:,1:4]
-
-    list3 = 10**(list1@ POLY_MATRIX)
-    list4 = 10**(list2@ POLY_MATRIX)
-
+    coeffs_T1 = allresults.loc[
+        allresults['Temperature (C)'] == T1,
+        ['A', 'B', 'C']
+    ]
     
-    logt = [np.log10(8),np.log10(15),np.log10(30),np.log10(60),np.log10(120),np.log10(240)]
-    logtReduced = logt + [-a+x for x in logt]
-    logS = list(np.log10(list3.iloc[0,:]))
-    logS.extend(list(np.log10(list4.iloc[0,:])))
+    coeffs_T2 = allresults.loc[
+        allresults['Temperature (C)'] == T2,
+        ['A', 'B', 'C']
+    ]
+
+    stiffness_T1 = 10**(coeffs_T1@ POLY_MATRIX)
+    stiffness_T2 = 10**(coeffs_T2@ POLY_MATRIX)
+    
+    logt = LOG_BBR_TIMES
+
+    logtReduced = np.concatenate([
+        logt,
+        logt - a
+    ])
+    
+    logS = list(np.log10(stiffness_T1.iloc[0,:]))
+    logS.extend(list(np.log10(stiffness_T2.iloc[0,:])))
     slope3, intercept3, r_value3, p_value3, std_err3 = stats.linregress(logtReduced, logS)
     return 1-abs(r_value3)
             
@@ -175,11 +172,12 @@ def gpl_objective(
 def ca_objective(
     params,
     reduced_omega,
-    dynamic_shear_modulus):
+    dynamic_shear_modulus,
+    glassy_modulus):
     beta, logOmegaC = params
 
     G_calc_CA = (
-        1000
+        glassy_modulus
         * (
             1
             + (10**logOmegaC/reduced_omega)**beta
@@ -196,7 +194,8 @@ def fatigue_objective(
     slope4,
     Tref,
     beta,
-    logOmegaC):
+    logOmegaC,
+    glassy_modulus):
     T = T[0]
 
     omega_red = (
@@ -204,13 +203,13 @@ def fatigue_objective(
         * 10**(
             slope4 *
             (
-                1/(T + 273.15)
-                - 1/(Tref + 273.15)
+                1/celsius_to_kelvin(T)
+                - 1/celsius_to_kelvin(Tref)
             )))
 
     phase = (90 / (1 + (omega_red / (10**logOmegaC))**beta))
 
-    G = (1000*1000 * (1 + (10**logOmegaC/omega_red)**beta)**(-1/beta))
+    G = (1000*glassy_modulus * (1 + (10**logOmegaC/omega_red)**beta)**(-1/beta))
 
     return (target_value - G*np.sin(np.radians(phase)))**2
 
@@ -220,13 +219,14 @@ def pavel_kriz_objective(
     slope4,
     Tref,
     beta,
-    logOmegaC
+    logOmegaC,
+    glassy_modulus
                 ):
     T = T[0]
-    omega_red_T_pavel_kriz = 10*10**(slope4*(1/(T+273.15)-1/(273.15+Tref)))
+    omega_red_T_pavel_kriz = 10*10**(slope4*(1/celsius_to_kelvin(T)-1/celsius_to_kelvin(Tref)))
     #phase_pavel_kriz = 90/(1+(omega_red_T_pavel_kriz/(10**result_CA.x[1]))**result_CA.x[0])
-    G_pavel_kriz = 1000*1000*(1+(10**logOmegaC/omega_red_T_pavel_kriz)**beta)**(-1/beta)
-    return (8967-G_pavel_kriz)**2
+    G_pavel_kriz = 1000*glassy_modulus*(1+(10**logOmegaC/omega_red_T_pavel_kriz)**beta)**(-1/beta)
+    return (PAVEL_KRIZ_MODULUS - G_pavel_kriz)**2
 
 def count_lines(file):
     try:
@@ -247,7 +247,9 @@ def count_lines(file):
 # Streamlit app layout
 st.title("BBRtoDSR Data Processor (beta release)")
 
-st.logo("icon.png", size="large")
+st.logo(
+    "icon.png", size="large"
+)
 
 
 # Create a sidebar
@@ -285,7 +287,16 @@ poissons_ratio = st.sidebar.slider(
 )
 
 generate_animation = st.sidebar.checkbox(
-    "Generate mastercurve animation"
+    "Generate master curve animation"
+)
+
+glassy_modulus = st.sidebar.number_input(
+    f"Glassy Shear Modulus ($G_{'g'}$) in MPa",
+    min_value=200.0,
+    max_value=2000.0,
+    value=float(DEFAULT_GLASSY_MODULUS_MPA),
+    step=100.0,
+    help="Glassy shear modulus used in the Christensen-Anderson model."
 )
 
 st.sidebar.markdown("""---""")
@@ -402,8 +413,8 @@ if st.session_state.uploaded_files:
                                                    model.coefficients[2],
                                                    model.coefficients[1],
                                                    model.coefficients[0],
-                                                   10**(model(np.log10(60))),
-                                                   abs(2*model.coefficients[0]*np.log10(60)+model.coefficients[1])]
+                                                   10**(model(np.log10(REFERENCE_BBR_TIME))),
+                                                   abs(2*model.coefficients[0]*np.log10(REFERENCE_BBR_TIME)+model.coefficients[1])]
                 fig = create_plot(results)
                 st.pyplot(fig)
             except Exception as e:
@@ -461,7 +472,7 @@ if st.session_state.uploaded_files:
             st.error("Unsupported file type.") 
 
     #
-if st.button("Print Results"):
+if st.button("Give me the DSR Results !"):
     st.markdown("""---""")
     st.subheader("Low Temperature Properties")
     allresults.sort_values('Temperature (C)',
@@ -472,12 +483,12 @@ if st.button("Print Results"):
     
     if len(allresults)>=2:
             
-            ddf1 = find_bracketing_rows(allresults,'m-value(60)',0.3)
-            ddf2 = find_bracketing_rows(allresults,'S(60)',300)
+            ddf1 = find_bracketing_rows(allresults,'m-value(60)', M_VALUE_LIMIT)
+            ddf2 = find_bracketing_rows(allresults,'S(60)', STIFFNESS_LIMIT)
             slope1, intercept1, r_value1, p_value1, std_err1 = stats.linregress(ddf1['m-value(60)'], ddf1['Temperature (C)'])
             slope2, intercept2, r_value2, p_value2, std_err2 = stats.linregress(np.log(ddf2['S(60)']), ddf2['Temperature (C)'])
-            T_s = round(-10+slope2*np.log(300)+intercept2,1)
-            T_m = round(-10+slope1*0.3+intercept1,1)
+            T_s = round(-10+slope2*np.log(STIFFNESS_LIMIT)+intercept2,1)
+            T_m = round(-10+slope1*M_VALUE_LIMIT+intercept1,1)
             Delta_Tc = round(T_s - T_m,1)
             st.write(f"**$T_{{{'c,S'}}}$: {T_s} °C**")
             st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
@@ -486,24 +497,25 @@ if st.button("Print Results"):
             st.markdown("""---""")
 
         
-            st.subheader(f"**Time-temperature Superposition, Shift factor using Arrhenius law**")
+            st.subheader("**Time-temperature Superposition, Shift factor using Arrhenius law**")
             st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {allresults['Temperature (C)'][0]} °C**")           
                       
             a_T_list = []
             Temperature_list = [allresults['Temperature (C)'][0]]
-            reduced_time_list = [8,15,30,60,120,240]
+            reduced_time_list = BBR_TIMES.tolist()
             stiffness_list = list(stiffness(allresults['Temperature (C)'][0], allresults).iloc[0,:])
             
             fig1, ax1 = plt.subplots()
             
-            ax1.plot([8,15,30,60,120,240], stiffness(allresults['Temperature (C)'][0], allresults).iloc[0,:],label=f'{allresults['Temperature (C)'][0]} °C', 
+            ax1.plot(BBR_TIMES, stiffness(allresults['Temperature (C)'][0], allresults).iloc[0,:],label=f'{allresults['Temperature (C)'][0]} °C', 
                      linestyle='-', linewidth=5.0, alpha=0.4,
                      marker='o')
             
             for i in range(1,len(allresults)):
                 fixed_T1 = allresults['Temperature (C)'][i-1]
                 fixed_T2 = allresults['Temperature (C)'][i]
-                initial_x = [np.log10(7200/60)*(1/(fixed_T2+273.15)-1/(fixed_T1+273.15))/(1/(-10+fixed_T1+273.15)-1/(fixed_T1+273.15))]
+                initial_x = [np.log10(7200/60)*(1/celsius_to_kelvin(fixed_T2)-1/celsius_to_kelvin(fixed_T1))/(
+                    1/(-10+celsius_to_kelvin(fixed_T1))-1/(celsius_to_kelvin(fixed_T1)))]
                 result = minimize(shift_factor_objective,
                                   initial_x,
                                   args=(fixed_T1, fixed_T2, allresults))
@@ -511,7 +523,7 @@ if st.button("Print Results"):
                 
                 a_T_list.append(result.x[0])
                 Temperature_list.append(allresults['Temperature (C)'][i])
-                reduced_time_list.extend([8,15,30,60,120,240]/(10**np.cumsum(a_T_list)[i-1]))
+                reduced_time_list.extend(BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]))
                 stiffness_list.extend(stiffness(allresults['Temperature (C)'][i], allresults).iloc[0,:])
                 
                 
@@ -519,12 +531,12 @@ if st.button("Print Results"):
                 
                 
                 
-                ax1.plot([8,15,30,60,120,240]/(10**np.cumsum(a_T_list)[i-1]),
+                ax1.plot(BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]),
                          stiffness(allresults['Temperature (C)'][i], allresults).iloc[0,:],
                                    label=f'{allresults['Temperature (C)'][i]} °C', 
                                    linestyle='-',marker='o', linewidth=5.0, alpha=0.4)
             
-            Trans_temp = np.array([1/(273.15 + x)-1/(273.15+Temperature_list[0]) for x in Temperature_list])
+            Trans_temp = np.array([1/celsius_to_kelvin(x)-1/celsius_to_kelvin(Temperature_list[0]) for x in Temperature_list])
             logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
             
             slope4, intercept4 = linear_regression(Trans_temp, logaT_arr, proportional=True)
@@ -555,15 +567,15 @@ if st.button("Print Results"):
             ax4.legend(handles4, labels4)
             st.pyplot(fig4)
             
-            st.write(f"**$E_{'a'}$: {round(slope4*np.log(10)*8.314462618/1000,3)} kJ/mol**")
+            st.write(f"**$E_{'a'}$: {round(slope4*np.log(10)*GAS_CONSTANT/1000,3)} kJ/mol**")
             st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$**")
-            st.write(f"**Please note that the temperature is converted to Kelvin, and 'ln' in the function refers to the natural logarithm.**")
+            st.write("**Please note that the temperature is converted to Kelvin, and 'ln' in the function refers to the natural logarithm.**")
             st.write(f"**An $r^{2}$ value below 0.98 raises concerns and warrants rechecking the BBR test data.**")
         
             
             st.markdown("""---""")
             
-            ax1.set_title('Plot of Stiffness Mastercurve vs Reduced Time')
+            ax1.set_title('Plot of Stiffness Master Curve vs Reduced Time')
             ax1.set_xlabel('Time (s)')
             ax1.set_ylabel('Stiffness (MPa)')
             ax1.set_xscale('log')
@@ -573,7 +585,7 @@ if st.button("Print Results"):
             st.pyplot(fig1)
 
             st.markdown("""---""")
-            st.subheader(f"**Creep Compliance Mastercurve, Generalized Power Law (GPL)**")
+            st.subheader("**Creep Compliance Master Curve, Generalized Power Law (GPL)**")
             creep_comp_list = [1/i for i in stiffness_list]
             reduced_time = np.array(reduced_time_list)
             creep_compliance = np.array(creep_comp_list)
@@ -617,7 +629,7 @@ if st.button("Print Results"):
             st.pyplot(fig2)
 
             st.markdown("""---""")
-            st.subheader(f"**Complex Modulus Mastercurve, Christensen–Anderson (CA) Model**")
+            st.subheader("**Complex Modulus Master Curve, Christensen–Anderson (CA) Model**")
 
             reduced_omega = 2/(np.pi*reduced_time)
             storage_compliance = (10**result_gpl.x[1]) + (10**result_gpl.x[2]) * math.gamma(1+result_gpl.x[0]) * (reduced_omega)**(-result_gpl.x[0]) * np.cos(result_gpl.x[0] * np.pi/2)
@@ -633,18 +645,20 @@ if st.button("Print Results"):
                                 initial_data_CA,
                                 args=(
                                     reduced_omega,
-                                    dynamic_shear_modulus
+                                    dynamic_shear_modulus,
+                                    glassy_modulus
+                            
                                 )
                             )
             
             newomega = 10**np.linspace(np.log10(reduced_omega).min(),np.log10(reduced_omega).max(),50)
-            newG_CA = 1000*(1+(10**result_CA.x[1]/newomega)**result_CA.x[0])**(-1/result_CA.x[0])
+            newG_CA = glassy_modulus*(1+(10**result_CA.x[1]/newomega)**result_CA.x[0])**(-1/result_CA.x[0])
             newphase_CA = 90/(1+(newomega/(10**result_CA.x[1]))**result_CA.x[0])
             
             st.write(f"**β: {round(result_CA.x[0],3)}**")
             st.write(f"**log$ω_{'C'}$: {round(result_CA.x[1],3)} at $T_{{{"ref"}}}$**")
         
-            logomega_C_zero = np.log10((10**result_CA.x[1])*(10**(slope4*(1/(0+273.15)-1/(273.15+allresults['Temperature (C)'][0])))))
+            logomega_C_zero = np.log10((10**result_CA.x[1])*(10**(slope4*(1/celsius_to_kelvin(0)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))))
 
             st.write(f"**log$ω_{'C'}$: {round(logomega_C_zero,3)} at 0°C**")
                         
@@ -664,17 +678,17 @@ if st.button("Print Results"):
             st.pyplot(fig5)
         
             st.write(f"**Rheological Index: {round(np.log10(2)/result_CA.x[0],2)}**")
-            st.write(f"**The glassy modulus ($G_{'g'}$) was assumed to be a constant value of 1 GPa.**")
+            st.write(f"**The glassy modulus ($G_{'g'}$) was assumed to be a constant value of {glassy_modulus/1000: .1f} GPa.**")
         
 
             st.markdown("""---""")
-            st.subheader(f"**Glover-Rowe Parameter, Cracking Performance**")
+            st.subheader("**Glover-Rowe Parameter, Cracking Performance**")
 
         
             omega_GR = 0.005
-            omega_GR_reduced = omega_GR * 10**(slope4*(1/(15+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+            omega_GR_reduced = omega_GR * 10**(slope4*(1/celsius_to_kelvin(15)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
             phase_GR = 90/(1+(omega_GR_reduced/(10**result_CA.x[1]))**result_CA.x[0])
-            G_GR = 1000*1000*(1+(10**result_CA.x[1]/omega_GR_reduced)**result_CA.x[0])**(-1/result_CA.x[0])
+            G_GR = 1000*glassy_modulus*(1+(10**result_CA.x[1]/omega_GR_reduced)**result_CA.x[0])**(-1/result_CA.x[0])
             
             G_R = (G_GR/(np.sin(np.radians(phase_GR))))*(np.cos(np.radians(phase_GR)))**2
 
@@ -698,7 +712,7 @@ if st.button("Print Results"):
             ax6.legend(handles6, labels6)
             st.pyplot(fig6)
 
-            st.write(f"**The Glover-Rowe parameter, which is based on the DSR Fn proposed by [Glover et al.](https://rosap.ntl.bts.gov/view/dot/81884), was originally developed to relate dynamic rheological properties in shear mode to tensile failure strain (ductility) in tension mode for pure or unmodified bitumen (asphalt binder). If the tested sample is modified, however, care should be taken, as high G-R values do not necessarily correlate with low ductility values.**")
+            st.write("**The Glover-Rowe parameter, which is based on the DSR Fn proposed by [Glover et al.](https://rosap.ntl.bts.gov/view/dot/81884), was originally developed to relate dynamic rheological properties in shear mode to tensile failure strain (ductility) in tension mode for pure or unmodified bitumen (asphalt binder). If the tested sample is modified, however, care should be taken, as high G-R values do not necessarily correlate with low ductility values.**")
         
             st.markdown("""---""")
             
@@ -707,41 +721,43 @@ if st.button("Print Results"):
                 fatigue_objective,
                 [22],
                 args=(
-                    5000,
+                    FATIGUE_LIMIT,
                     slope4,
                     allresults['Temperature (C)'][0],
                     result_CA.x[0],
-                    result_CA.x[1]
+                    result_CA.x[1],
+                    glassy_modulus
                 )
             )
 
-            st.subheader(f"**Fatigue Cracking Criteria**")
+            st.subheader("**Fatigue Cracking Criteria**")
             st.write(f"**$T_{{{'G"=5000kPa'}}}$: {round(result_T_fatigue.x[0],1)} °C**")
 
             result_T_fatigue_6000 = minimize(
                                             fatigue_objective,
                                             [22],
                                             args=(
-                                                6000,
+                                                FATIGUE_LIMIT_ALT,
                                                 slope4,
                                                 allresults['Temperature (C)'][0],
                                                 result_CA.x[0],
-                                                result_CA.x[1]
+                                                result_CA.x[1],
+                                                glassy_modulus
                                             )
                                         )
 
             st.write(f"**$T_{{{'G"=6000kPa'}}}$: {round(result_T_fatigue_6000.x[0],1)} °C**")
 
             omega_fatigue6_superpave = 10
-            omega_fatigue6_superpave_reduced = omega_fatigue6_superpave * 10**(slope4*(1/(result_T_fatigue_6000.x[0]+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+            omega_fatigue6_superpave_reduced = omega_fatigue6_superpave * 10**(slope4*(1/celsius_to_kelvin(result_T_fatigue_6000.x[0])-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
             phase_fatigue6 = 90/(1+(omega_fatigue6_superpave_reduced/(10**result_CA.x[1]))**result_CA.x[0])
 
             st.write(f"**$δ_{{{'G"=6000kPa'}}}$: {round(phase_fatigue6,1)} °**")
         
             Temperature_fatigue_list = np.array([4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 40])
-            Omega_fatigue_list = 10 * 10**(slope4*(1/(Temperature_fatigue_list+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+            Omega_fatigue_list = 10 * 10**(slope4*(1/celsius_to_kelvin(Temperature_fatigue_list)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
             phase_fatigue_list = 90/(1+(Omega_fatigue_list/(10**result_CA.x[1]))**result_CA.x[0])
-            G_fatigue_list = 1000*1000*(1+(10**result_CA.x[1]/Omega_fatigue_list)**result_CA.x[0])**(-1/result_CA.x[0])
+            G_fatigue_list = 1000*glassy_modulus*(1+(10**result_CA.x[1]/Omega_fatigue_list)**result_CA.x[0])**(-1/result_CA.x[0])
             G_storage_fatigue_list = G_fatigue_list * np.cos(np.radians(phase_fatigue_list))
             G_loss_fatigue_list = G_fatigue_list * np.sin(np.radians(phase_fatigue_list))
             
@@ -758,8 +774,8 @@ if st.button("Print Results"):
             ax7.plot(phase_fatigue_list, G_fatigue_list, label='Superpave Fatigue Points, ω = 10 Rad/s', 
                      linestyle='None',
                      marker='o', alpha=0.7, markersize=2, c='red')
-            ax7.plot(np.arange(1,89,1),5000/np.sin(np.radians(np.arange(1,89,1))),label='|G*|sinδ = 5000 kPa',linestyle='--',marker='None',c='black')
-            ax7.plot(np.arange(1,89,1),6000/np.sin(np.radians(np.arange(1,89,1))),label='|G*|sinδ = 6000 kPa',linestyle='-.',marker='None',c='black',alpha=0.3)
+            ax7.plot(np.arange(1,89,1),FATIGUE_LIMIT/np.sin(np.radians(np.arange(1,89,1))),label='|G*|sinδ = 5000 kPa',linestyle='--',marker='None',c='black')
+            ax7.plot(np.arange(1,89,1),FATIGUE_LIMIT_ALT/np.sin(np.radians(np.arange(1,89,1))),label='|G*|sinδ = 6000 kPa',linestyle='-.',marker='None',c='black',alpha=0.3)
             ax7.set_title('Black Diagram')
             ax7.set_xlabel('Phase Angle (°)')
             ax7.set_ylabel('|G*| (kPa)')
@@ -774,7 +790,7 @@ if st.button("Print Results"):
 
 
             st.markdown("""---""")
-            st.subheader(f"**Pavel-Kriz Phase Angle, [Detection of Phase Incompatible Binders](https://trid.trb.org/View/2344464/)**")
+            st.subheader("**Pavel-Kriz Phase Angle, [Detection of Phase Incompatible Binders](https://trid.trb.org/View/2344464/)**")
 
             initial_data_T_pavel_kriz = [22]
             
@@ -786,14 +802,15 @@ if st.button("Print Results"):
                                                 slope4,
                                                 allresults['Temperature (C)'][0],
                                                 result_CA.x[0],
-                                                result_CA.x[1]
+                                                result_CA.x[1],
+                                                glassy_modulus
                                             )
                                         )
         
-            Omega_pavel_kriz = 10 * 10**(slope4*(1/(result_T_pavel_kriz.x[0]+273.15)-1/(273.15+allresults['Temperature (C)'][0])))
+            Omega_pavel_kriz = 10 * 10**(slope4*(1/celsius_to_kelvin(result_T_pavel_kriz.x[0])-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
             phase_pavel_kriz = 90/(1+(Omega_pavel_kriz/(10**result_CA.x[1]))**result_CA.x[0])
 
-            st.write(f"ω = 10 Rad/s")
+            st.write("ω = 10 Rad/s")
             st.write(f"T = {round(result_T_pavel_kriz.x[0],1)} °C")
             st.write(f"**$δ_{{{'|G*|=8967kPa'}}}$: {round(phase_pavel_kriz,1)} °**")
 
@@ -821,13 +838,13 @@ if st.button("Print Results"):
             if generate_animation:
 
                 st.markdown("""---""")
-                st.subheader(f"**Animated Master Curve Shifting**")
+                st.subheader("**Animated Master Curve Shifting**")
     
                 fig9, ax9 = plt.subplots()
                 ax9.set_yscale('log')
                 
                 movingshifts = np.insert(np.cumsum(a_T_list),0,0)
-                movingtime = np.array(np.log10([8, 15, 30, 60, 120, 240]))
+                movingtime = np.array(LOG_BBR_TIMES)
                 
                 lines = [ax9.plot([], [], label=f'T = {round(tem,2)} °C', antialiased=True, alpha = 0.4, linewidth = 5)[0] for tem in allresults['Temperature (C)']]
                 
@@ -851,7 +868,7 @@ if st.button("Print Results"):
                         lines[idx].set_data(shifted_time, mod)
                     return lines
     
-                ax9.set_title('Plot of Stiffness Mastercurve vs Reduced Time')
+                ax9.set_title('Plot of Stiffness Master Curve vs Reduced Time')
                 ax9.set_xlabel('Log Time (s)')
                 ax9.set_ylabel('Stiffness (MPa)')
                 handles9, labels9 = ax9.get_legend_handles_labels()
