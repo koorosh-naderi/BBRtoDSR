@@ -40,6 +40,78 @@ FATIGUE_LIMIT_ALT = 6000
 PAVEL_KRIZ_MODULUS = 6000 / np.sin(np.deg2rad(42))
 DISPLAY_DPI = 450
 
+
+def find_bracketing_rows(df, column_name, target_value):
+    # Sort the DataFrame by the specified column
+    df_sorted = df.sort_values(by=column_name)  
+    # Initialize variables for bracketing
+    lower_row = None
+    upper_row = None
+    # Iterate through the sorted DataFrame to find bracketing rows
+    for _, row in df_sorted.iterrows():
+        value = row[column_name]
+        if value < target_value:
+            lower_row = row
+        elif value > target_value and upper_row is None:
+            upper_row = row
+            break
+    # If both lower and upper rows are found, create a new DataFrame
+    if lower_row is not None and upper_row is not None:
+        return pd.DataFrame([lower_row, upper_row])
+    else:
+        # If no bracketing rows found, find the two closest rows
+        df_sorted['distance'] = abs(df_sorted[column_name] - target_value)
+        closest_rows = df_sorted.nsmallest(2, 'distance')
+        closest_rows = closest_rows.drop(columns='distance')  # Drop the distance column if you don't want it
+        return closest_rows
+
+
+def calculate_low_temperature_properties(allresults):
+    ddf1 = find_bracketing_rows(
+        allresults,
+        'm-value(60)',
+        M_VALUE_LIMIT)
+
+    ddf2 = find_bracketing_rows(
+        allresults,
+        'S(60)',
+        STIFFNESS_LIMIT)
+
+    slope1, intercept1, _, _, _ = stats.linregress(
+        ddf1['m-value(60)'],
+        ddf1['Temperature (C)'])
+
+    slope2, intercept2, _, _, _ = stats.linregress(
+        np.log(ddf2['S(60)']),
+        ddf2['Temperature (C)'])
+
+    T_s = round(
+        -10 + slope2 * np.log(STIFFNESS_LIMIT)
+        + intercept2,
+        1)
+
+    T_m = round(
+        -10 + slope1 * M_VALUE_LIMIT
+        + intercept1,
+        1)
+
+    Delta_Tc = round(
+        T_s - T_m,
+        1)
+
+    return {
+        "Tc_S": T_s,
+        "Tc_m": T_m,
+        "Delta_Tc": Delta_Tc,
+        "slope1": slope1,
+        "intercept1": intercept1,
+        "slope2": slope2,
+        "intercept2": intercept2,
+        "ddf1": ddf1,
+        "ddf2": ddf2
+    }
+
+
 def celsius_to_kelvin(temp_c):
     return temp_c + KELVIN_OFFSET
 
@@ -85,47 +157,21 @@ def create_plot(data):
     ax.legend(handles, labels)
     return fig
 
-def find_bracketing_rows(df, column_name, target_value):
-    # Sort the DataFrame by the specified column
-    df_sorted = df.sort_values(by=column_name)  
-    # Initialize variables for bracketing
-    lower_row = None
-    upper_row = None
-    # Iterate through the sorted DataFrame to find bracketing rows
-    for _, row in df_sorted.iterrows():
-        value = row[column_name]
-        if value < target_value:
-            lower_row = row
-        elif value > target_value and upper_row is None:
-            upper_row = row
-            break
-    # If both lower and upper rows are found, create a new DataFrame
-    if lower_row is not None and upper_row is not None:
-        return pd.DataFrame([lower_row, upper_row])
-    else:
-        # If no bracketing rows found, find the two closest rows
-        df_sorted['distance'] = abs(df_sorted[column_name] - target_value)
-        closest_rows = df_sorted.nsmallest(2, 'distance')
-        closest_rows = closest_rows.drop(columns='distance')  # Drop the distance column if you don't want it
-        return closest_rows
 
 def stiffness(T1, allresults):
     coeffs = allresults.loc[
         allresults['Temperature (C)'] == T1,
-        ['A', 'B', 'C']
-    ]
+        ['A', 'B', 'C']]
     return 10**(coeffs @ POLY_MATRIX)
 
 def shift_factor_error(T1, T2, a, allresults):
     coeffs_T1 = allresults.loc[
         allresults['Temperature (C)'] == T1,
-        ['A', 'B', 'C']
-    ]
+        ['A', 'B', 'C']]
     
     coeffs_T2 = allresults.loc[
         allresults['Temperature (C)'] == T2,
-        ['A', 'B', 'C']
-    ]
+        ['A', 'B', 'C']]
 
     stiffness_T1 = 10**(coeffs_T1@ POLY_MATRIX)
     stiffness_T2 = 10**(coeffs_T2@ POLY_MATRIX)
@@ -139,7 +185,7 @@ def shift_factor_error(T1, T2, a, allresults):
     
     logS = list(np.log10(stiffness_T1.iloc[0,:]))
     logS.extend(list(np.log10(stiffness_T2.iloc[0,:])))
-    slope3, intercept3, r_value3, p_value3, std_err3 = stats.linregress(logtReduced, logS)
+    _, _, r_value3, _, _ = stats.linregress(logtReduced, logS)
     return 1-abs(r_value3)
             
 def shift_factor_objective(
@@ -152,7 +198,6 @@ def shift_factor_objective(
         T2,
         x[0],
         allresults)
-
 
 def gpl_objective(
     params,
@@ -187,7 +232,6 @@ def ca_objective(
         (np.log10(G_calc_CA)
             - np.log10(dynamic_shear_modulus))**2)
 
-
 def fatigue_objective(
     T,
     target_value,
@@ -212,7 +256,6 @@ def fatigue_objective(
     G = (1000*glassy_modulus * (1 + (10**logOmegaC/omega_red)**beta)**(-1/beta))
 
     return (target_value - G*np.sin(np.radians(phase)))**2
-
 
 def pavel_kriz_objective(
     T,
@@ -248,8 +291,7 @@ def count_lines(file):
 st.title("BBRtoDSR Data Processor (beta release)")
 
 st.logo(
-    "icon.png", size="large"
-)
+    "icon.png", size="large")
 
 
 # Create a sidebar
@@ -483,33 +525,44 @@ if st.button("Give me the DSR Results !"):
     
     if len(allresults)>=2:
             
-            ddf1 = find_bracketing_rows(allresults,'m-value(60)', M_VALUE_LIMIT)
-            ddf2 = find_bracketing_rows(allresults,'S(60)', STIFFNESS_LIMIT)
-            slope1, intercept1, r_value1, p_value1, std_err1 = stats.linregress(ddf1['m-value(60)'], ddf1['Temperature (C)'])
-            slope2, intercept2, r_value2, p_value2, std_err2 = stats.linregress(np.log(ddf2['S(60)']), ddf2['Temperature (C)'])
-            T_s = round(-10+slope2*np.log(STIFFNESS_LIMIT)+intercept2,1)
-            T_m = round(-10+slope1*M_VALUE_LIMIT+intercept1,1)
-            Delta_Tc = round(T_s - T_m,1)
+            low_temp = calculate_low_temperature_properties(
+                allresults
+            )
+            
+            T_s = low_temp["Tc_S"]
+            T_m = low_temp["Tc_m"]
+            Delta_Tc = low_temp["Delta_Tc"]
+            
             st.write(f"**$T_{{{'c,S'}}}$: {T_s} °C**")
             st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
             st.write(f"**$Δ T_{'c'}$: {Delta_Tc} °C**")
+
 
             st.markdown("""---""")
 
         
             st.subheader("**Time-temperature Superposition, Shift factor using Arrhenius law**")
+            
             st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {allresults['Temperature (C)'][0]} °C**")           
                       
+            
             a_T_list = []
+            master_curve_series = []
+            shift_data = []
+            
             Temperature_list = [allresults['Temperature (C)'][0]]
             reduced_time_list = BBR_TIMES.tolist()
             stiffness_list = list(stiffness(allresults['Temperature (C)'][0], allresults).iloc[0,:])
             
-            fig1, ax1 = plt.subplots()
+            master_curve_series.append({
+                "temperature": allresults['Temperature (C)'][0],
+                "time": BBR_TIMES,
+                "stiffness": stiffness(
+                    allresults['Temperature (C)'][0],
+                    allresults
+                ).iloc[0,:]
+            })
             
-            ax1.plot(BBR_TIMES, stiffness(allresults['Temperature (C)'][0], allresults).iloc[0,:],label=f'{allresults['Temperature (C)'][0]} °C', 
-                     linestyle='-', linewidth=5.0, alpha=0.4,
-                     marker='o')
             
             for i in range(1,len(allresults)):
                 fixed_T1 = allresults['Temperature (C)'][i-1]
@@ -526,16 +579,22 @@ if st.button("Give me the DSR Results !"):
                 reduced_time_list.extend(BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]))
                 stiffness_list.extend(stiffness(allresults['Temperature (C)'][i], allresults).iloc[0,:])
                 
+                shift_data.append({
+                    "temperature": allresults['Temperature (C)'][i],
+                    "shift_factor": result.x[0],
+                    "cumulative_shift": np.cumsum(a_T_list)[i-1]
+                })
                 
-                st.write(f"**$loga_{{{'T ='}{allresults['Temperature (C)'][i]}{'°C'}}}$: {round(np.cumsum(a_T_list)[i-1],2)}**")
                 
-                
-                
-                ax1.plot(BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]),
-                         stiffness(allresults['Temperature (C)'][i], allresults).iloc[0,:],
-                                   label=f'{allresults['Temperature (C)'][i]} °C', 
-                                   linestyle='-',marker='o', linewidth=5.0, alpha=0.4)
-            
+                master_curve_series.append({
+                    "temperature": allresults['Temperature (C)'][i],
+                    "time": BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]),
+                    "stiffness": stiffness(
+                        allresults['Temperature (C)'][i],
+                        allresults
+                    ).iloc[0,:]
+                })
+                      
             Trans_temp = np.array([1/celsius_to_kelvin(x)-1/celsius_to_kelvin(Temperature_list[0]) for x in Temperature_list])
             logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
             
@@ -547,6 +606,15 @@ if st.button("Give me the DSR Results !"):
             mean_y = sum(logaT_arr) / len(logaT_arr)
             tss = sum((yi - mean_y) ** 2 for yi in logaT_arr)
             r_squared_Arrhenius = 1 - rss / tss
+
+            for item in shift_data:
+
+                st.write(
+                    f"**$loga_{{T={item['temperature']:.1f}°C}}$: "
+                    f"{item['cumulative_shift']:.2f}**"
+                )
+
+
 
             fig4, ax4 = plt.subplots()
             ax4.plot(np.array(Temperature_list), 10**logaT_arr, label='Shift Factors', 
@@ -574,6 +642,19 @@ if st.button("Give me the DSR Results !"):
         
             
             st.markdown("""---""")
+            
+            fig1, ax1 = plt.subplots()
+            for curve in master_curve_series:
+
+                ax1.plot(
+                    curve["time"],
+                    curve["stiffness"],
+                    label=f'{curve["temperature"]} °C',
+                    linestyle='-',
+                    linewidth=5.0,
+                    alpha=0.4,
+                    marker='o'
+                )
             
             ax1.set_title('Plot of Stiffness Master Curve vs Reduced Time')
             ax1.set_xlabel('Time (s)')
