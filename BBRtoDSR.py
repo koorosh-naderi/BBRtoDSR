@@ -321,7 +321,8 @@ def compute_ca(
     logD1,
     m,
     poissons_ratio,
-    glassy_modulus
+    glassy_modulus,
+    optimize_glassy_modulus=False
               ):
     
     reduced_omega = 2/(np.pi*reduced_time)
@@ -331,31 +332,78 @@ def compute_ca(
     dynamic_modulus = 1/dynamic_compliance
     dynamic_shear_modulus = dynamic_modulus/(2*(1+poissons_ratio))
     
-    initial_data_CA = [0.1,-3]
+    #initial_data_CA = [0.1,-3]
     
-    result_CA = minimize(
-                        ca_objective,
-                        initial_data_CA,
-                        args=(
-                            reduced_omega,
-                            dynamic_shear_modulus,
-                            glassy_modulus
+    #result_CA = minimize(
+    #                    ca_objective,
+    #                    initial_data_CA,
+    #                    args=(
+    #                        reduced_omega,
+    #                        dynamic_shear_modulus,
+    #                        glassy_modulus
                     
-                            ),
+    #                        ),
                         
-                    )
+    #                )
+    if optimize_glassy_modulus:
+
+        initial_data_CA = [
+            0.1,
+            -3,
+            np.log10(glassy_modulus)
+        ]
+    
+        result_CA = minimize(
+            ca_objective_opt,
+            initial_data_CA,
+            args=(
+                reduced_omega,
+                dynamic_shear_modulus
+            ),
+            bounds=[
+                (0.01, 5),
+                (-10, 10),
+                (2.3, 4)
+            ]
+        )
+
+    else:
+
+        initial_data_CA = [0.1,-3]
+    
+        result_CA = minimize(
+            ca_objective,
+            initial_data_CA,
+            args=(
+                reduced_omega,
+                dynamic_shear_modulus,
+                glassy_modulus
+            )
+        )
+    
+    if optimize_glassy_modulus:
+        beta = result_CA.x[0]
+        logOmegaC = result_CA.x[1]
+        logGg = result_CA.x[2]
+        fitted_Gg = 10**logGg
+    else:
+        beta = result_CA.x[0]
+        logOmegaC = result_CA.x[1]
+        fitted_Gg = glassy_modulus
+    
+    
     
     newomega = 10**np.linspace(np.log10(reduced_omega).min(),np.log10(reduced_omega).max(),50)
-    newG_CA = glassy_modulus*(1+(10**result_CA.x[1]/newomega)**result_CA.x[0])**(-1/result_CA.x[0])
-    newphase_CA = 90/(1+(newomega/(10**result_CA.x[1]))**result_CA.x[0])
+    newG_CA = fitted_Gg*(1+(10**logOmegaC/newomega)**beta)**(-1/beta)
+    newphase_CA = 90/(1+(newomega/(10**logOmegaC))**beta)
     
     predicted_dynamic_shear_modulus = (
-    glassy_modulus
+    fitted_Gg
     * (
         1 +
-        (10**result_CA.x[1]/reduced_omega)
-        **result_CA.x[0]
-    )**(-1/result_CA.x[0])
+        (10**logOmegaC/reduced_omega)
+        **beta
+    )**(-1/beta)
     )
     
     rss = np.sum(
@@ -388,6 +436,7 @@ def compute_ca(
     )
     
     
+    
     return {
     "beta": result_CA.x[0],
     "logOmegaC": result_CA.x[1],
@@ -401,6 +450,7 @@ def compute_ca(
     "rmse": rmse_ca,
     "success": result_CA.success,
     "message": result_CA.message,
+    "glassy_modulus": fitted_Gg
 }
 
 
@@ -691,6 +741,33 @@ def ca_objective(
         (np.log10(G_calc_CA)
             - np.log10(dynamic_shear_modulus))**2)
 
+def ca_objective_opt(
+    params,
+    reduced_omega,
+    dynamic_shear_modulus
+):
+    
+    beta, logOmegaC, logGg = params
+    
+    Gg = 10**logGg
+
+    G_calc_CA = (
+        Gg
+        * (
+            1 +
+            (10**logOmegaC / reduced_omega)**beta
+        )**(-1/beta)
+    )
+
+    return np.sum(
+        (
+            np.log10(G_calc_CA)
+            -
+            np.log10(dynamic_shear_modulus)
+        )**2
+    )
+
+
 def fatigue_objective(
     T,
     target_value,
@@ -749,9 +826,7 @@ def count_lines(file):
 # Streamlit app layout
 st.title("BBRtoDSR Data Processor (beta release)")
 
-st.logo(
-    "icon.png", size="large"
-)
+st.logo("icon.png", size="large")
 
 
 # Create a sidebar
@@ -788,10 +863,13 @@ poissons_ratio = st.sidebar.slider(
     help="Adjust the Poisson's ratio between 0.25 and 0.5"  # Optional help text
 )
 
-#optimize_glassy_modulus = st.sidebar.checkbox(
-#    f"Optimize glassy shear modulus ($G_{'g'}$)",
-#    value=False
-#)
+optimize_glassy_modulus = st.sidebar.checkbox(
+    f"Optimize glassy shear modulus ($G_{'g'}$)",
+    value=False,
+    help=(
+    f"Optimizes $G_{'g'}$ together with β and log$ω_{'C'}$. "
+    f"If unsure, leave unchecked and use a fixed $G_{'g'}$ value.")
+)
 
 glassy_modulus = st.sidebar.number_input(
     f"Glassy Shear Modulus ($G_{'g'}$) in MPa",
@@ -1106,7 +1184,8 @@ if st.button("Give me the DSR Results !"):
                 logD1,
                 m,
                 poissons_ratio,
-                glassy_modulus
+                glassy_modulus,
+                optimize_glassy_modulus
             )
             
             beta = ca["beta"]
@@ -1118,8 +1197,12 @@ if st.button("Give me the DSR Results !"):
             newphase_CA = ca["newphase_CA"]
             r2_CA = ca["r2"]
             rmse_CA = ca["rmse"]
+            glassy_modulus_CA = ca["glassy_modulus"]
             
             
+            
+            
+
             logomega_C_zero = np.log10((10**logOmegaC)*(10**(slope4*(1/celsius_to_kelvin(0)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))))
             
             if not ca["success"] and r2_CA < 0.99:
@@ -1128,8 +1211,10 @@ if st.button("Give me the DSR Results !"):
             
             st.write(f"**β: {round(beta,3)}**")
             st.write(f"**log$ω_{'C'}$: {round(logOmegaC,3)} at $T_{{{"ref"}}}$**")
-        
-
+            st.write(
+                f"**$G_g$: {glassy_modulus_CA:.0f} MPa**"
+            )
+            
             st.write(f"**log$ω_{'C'}$: {round(logomega_C_zero,3)} at 0°C**")
             st.write(f"**Rheological Index: {round(np.log10(2)/beta, 2)}**")
                         
@@ -1145,9 +1230,18 @@ if st.button("Give me the DSR Results !"):
             
             st.pyplot(ca_fig)
 
-        
+            if optimize_glassy_modulus:
+                st.write(
+                    f"**The glassy modulus ($G_g$) was optimized as part of the CA model fit and converged to "
+                    f"{glassy_modulus_CA/1000:.2f} GPa.**"
+                )
+            else:
+                st.write(
+                    f"**The glassy modulus ($G_g$) was fixed at "
+                    f"{glassy_modulus_CA/1000:.2f} GPa during the CA model fit.**"
+                )
             
-            st.write(f"**The glassy modulus ($G_{'g'}$) was assumed to be a constant value of {glassy_modulus/1000: .1f} GPa.**")
+            #st.write(f"**The glassy modulus ($G_{'g'}$) was assumed to be a constant value of {glassy_modulus/1000: .1f} GPa.**")
         
 
             st.markdown("""---""")
@@ -1157,7 +1251,7 @@ if st.button("Give me the DSR Results !"):
             omega_GR = 0.005
             omega_GR_reduced = omega_GR * 10**(slope4*(1/celsius_to_kelvin(15)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
             phase_GR = 90/(1+(omega_GR_reduced/(10**logOmegaC))**beta)
-            G_GR = 1000*glassy_modulus*(1+(10**logOmegaC/omega_GR_reduced)**beta)**(-1/beta)
+            G_GR = 1000*glassy_modulus_CA*(1+(10**logOmegaC/omega_GR_reduced)**beta)**(-1/beta)
             
             G_R = (G_GR/(np.sin(np.radians(phase_GR))))*(np.cos(np.radians(phase_GR)))**2
 
@@ -1195,7 +1289,7 @@ if st.button("Give me the DSR Results !"):
                     allresults['Temperature (C)'][0],
                     beta,
                     logOmegaC,
-                    glassy_modulus
+                    glassy_modulus_CA
                 )
             )
 
@@ -1211,7 +1305,7 @@ if st.button("Give me the DSR Results !"):
                                                 allresults['Temperature (C)'][0],
                                                 beta,
                                                 logOmegaC,
-                                                glassy_modulus
+                                                glassy_modulus_CA
                                             )
                                         )
 
@@ -1226,7 +1320,7 @@ if st.button("Give me the DSR Results !"):
             Temperature_fatigue_list = np.array([4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 40])
             Omega_fatigue_list = 10 * 10**(slope4*(1/celsius_to_kelvin(Temperature_fatigue_list)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
             phase_fatigue_list = 90/(1+(Omega_fatigue_list/(10**logOmegaC))**beta)
-            G_fatigue_list = 1000*glassy_modulus*(1+(10**logOmegaC/Omega_fatigue_list)**beta)**(-1/beta)
+            G_fatigue_list = 1000*glassy_modulus_CA*(1+(10**logOmegaC/Omega_fatigue_list)**beta)**(-1/beta)
             G_storage_fatigue_list = G_fatigue_list * np.cos(np.radians(phase_fatigue_list))
             G_loss_fatigue_list = G_fatigue_list * np.sin(np.radians(phase_fatigue_list))
             
@@ -1272,7 +1366,7 @@ if st.button("Give me the DSR Results !"):
                                                 allresults['Temperature (C)'][0],
                                                 beta,
                                                 logOmegaC,
-                                                glassy_modulus
+                                                glassy_modulus_CA
                                             )
                                         )
         
@@ -1368,56 +1462,3 @@ if st.button("Give me the DSR Results !"):
                 st.video(video_bytes)
     else:
         st.write("Upload a minimum of two CSV files for further analysis.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
