@@ -143,7 +143,269 @@ def fit_bbr_curve(data):
     results = data[data['Time (s)'].isin(BBR_TIMES)]
     return data, results, model
 
-# Function to create plots
+
+def compute_tts(allresults):
+
+    a_T_list = []
+    master_curve_series = []
+    shift_data = []
+
+    temperatures = [allresults['Temperature (C)'][0]]
+
+    reduced_time_list = BBR_TIMES.tolist()
+
+    stiffness_list = list(
+        stiffness(
+            allresults['Temperature (C)'][0],
+            allresults
+        ).iloc[0,:]
+    )
+
+    master_curve_series.append({
+        "temperature": allresults['Temperature (C)'][0],
+        "time": BBR_TIMES,
+        "stiffness": stiffness(
+            allresults['Temperature (C)'][0],
+            allresults
+        ).iloc[0,:]
+    })
+
+    
+    for i in range(1,len(allresults)):
+        fixed_T1 = allresults['Temperature (C)'][i-1]
+        fixed_T2 = allresults['Temperature (C)'][i]
+        initial_x = [np.log10(7200/60)*(1/celsius_to_kelvin(fixed_T2)-1/celsius_to_kelvin(fixed_T1))/(
+            1/(-10+celsius_to_kelvin(fixed_T1))-1/(celsius_to_kelvin(fixed_T1)))]
+        result = minimize(shift_factor_objective,
+                          initial_x,
+                          args=(fixed_T1, fixed_T2, allresults))
+        
+        
+        a_T_list.append(result.x[0])
+        temperatures.append(allresults['Temperature (C)'][i])
+        reduced_time_list.extend(BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]))
+        stiffness_list.extend(stiffness(allresults['Temperature (C)'][i], allresults).iloc[0,:])
+        
+        shift_data.append({
+            "temperature": allresults['Temperature (C)'][i],
+            "shift_factor": result.x[0],
+            "cumulative_shift": np.cumsum(a_T_list)[i-1]
+        })
+        
+        
+        master_curve_series.append({
+            "temperature": allresults['Temperature (C)'][i],
+            "time": BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]),
+            "stiffness": stiffness(
+                allresults['Temperature (C)'][i],
+                allresults
+            ).iloc[0,:]
+        })
+    inverse_temperature_difference = np.array([1/celsius_to_kelvin(x)-1/celsius_to_kelvin(temperatures[0]) for x in temperatures])
+    logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
+    
+    slope4, _ = linear_regression(inverse_temperature_difference, logaT_arr, proportional=True)
+
+    predicted_logaT_arr = [slope4 * xi for xi in inverse_temperature_difference]
+    
+    rss = sum((yi - y_pred) ** 2 for yi, y_pred in zip(logaT_arr, predicted_logaT_arr))
+    mean_y = sum(logaT_arr) / len(logaT_arr)
+    tss = sum((yi - mean_y) ** 2 for yi in logaT_arr)
+    r_squared_Arrhenius = 1 - rss / tss
+    
+    shift_factor_values = 10**logaT_arr
+    arrhenius_values = 10**(slope4 * inverse_temperature_difference)
+
+    return {
+    "a_T_list": a_T_list,
+    "temperatures": temperatures,
+    "reduced_time_list": reduced_time_list,
+    "stiffness_list": stiffness_list,
+    "shift_data": shift_data,
+    "master_curve_series": master_curve_series,
+    "slope4": slope4,
+    "r_squared_Arrhenius": r_squared_Arrhenius,
+    "shift_factor_values": shift_factor_values,
+    "arrhenius_values": arrhenius_values
+            }
+
+def compute_gpl(
+    reduced_time_list,
+    stiffness_list
+):
+
+    creep_comp_list = [1/i for i in stiffness_list]
+
+    reduced_time = np.array(reduced_time_list)
+
+    creep_compliance = np.array(
+        creep_comp_list
+    )
+
+    initial_data = [0.3, -2, -3]
+
+    result_gpl = minimize(
+        gpl_objective,
+        initial_data,
+        args=(
+            reduced_time,
+            creep_compliance
+        )
+    )
+
+    newtime = 10**np.linspace(
+        np.log10(reduced_time).min(),
+        np.log10(reduced_time).max(),
+        50
+    )
+    
+    predicted_creep_compliance = (
+    10**result_gpl.x[1]
+    + 10**result_gpl.x[2]
+    * reduced_time**result_gpl.x[0])
+
+    newcreepcom = (
+        10**result_gpl.x[1]
+        + 10**result_gpl.x[2]
+        * newtime**result_gpl.x[0]
+    )
+    
+    rss = np.sum(
+    (
+        np.log10(creep_compliance)
+        - np.log10(predicted_creep_compliance)
+    )**2
+    )
+    
+    tss = np.sum(
+        (
+            np.log10(creep_compliance)
+            - np.mean(
+                np.log10(creep_compliance)
+            )
+        )**2
+    )
+    
+    r2_gpl = 1 - rss / tss
+    rmse_log = np.sqrt(
+    np.mean(
+        (
+            np.log10(creep_compliance)
+            - np.log10(predicted_creep_compliance)
+        )**2
+    )
+    )
+    
+
+    return {
+        "m": result_gpl.x[0],
+        "logD0": result_gpl.x[1],
+        "logD1": result_gpl.x[2],
+        "creep_comp_list": creep_comp_list,
+        "reduced_time": reduced_time,
+        "creep_compliance": creep_compliance,
+        "newtime": newtime,
+        "newcreepcom": newcreepcom,
+        "result": result_gpl,
+        "success": result_gpl.success,
+        "message": result_gpl.message,
+        "r2": r2_gpl,
+        "rmse_log": rmse_log,
+        "objective_value": result_gpl.fun
+        
+    }
+
+def compute_ca(
+    reduced_time,
+    logD0,
+    logD1,
+    m,
+    poissons_ratio,
+    glassy_modulus
+              ):
+    
+    reduced_omega = 2/(np.pi*reduced_time)
+    storage_compliance = (10**logD0) + (10**logD1) * math.gamma(1+m) * (reduced_omega)**(-m) * np.cos(m * np.pi/2)
+    loss_compliance = (10**logD1) * math.gamma(1+m) * (reduced_omega)**(-m) * np.sin(m * np.pi/2)
+    dynamic_compliance = (storage_compliance**2 + loss_compliance**2)**0.5
+    dynamic_modulus = 1/dynamic_compliance
+    dynamic_shear_modulus = dynamic_modulus/(2*(1+poissons_ratio))
+    
+    initial_data_CA = [0.1,-3]
+    
+    result_CA = minimize(
+                        ca_objective,
+                        initial_data_CA,
+                        args=(
+                            reduced_omega,
+                            dynamic_shear_modulus,
+                            glassy_modulus
+                    
+                            ),
+                        
+                    )
+    
+    newomega = 10**np.linspace(np.log10(reduced_omega).min(),np.log10(reduced_omega).max(),50)
+    newG_CA = glassy_modulus*(1+(10**result_CA.x[1]/newomega)**result_CA.x[0])**(-1/result_CA.x[0])
+    newphase_CA = 90/(1+(newomega/(10**result_CA.x[1]))**result_CA.x[0])
+    
+    predicted_dynamic_shear_modulus = (
+    glassy_modulus
+    * (
+        1 +
+        (10**result_CA.x[1]/reduced_omega)
+        **result_CA.x[0]
+    )**(-1/result_CA.x[0])
+    )
+    
+    rss = np.sum(
+    (
+        np.log10(dynamic_shear_modulus)
+        -
+        np.log10(predicted_dynamic_shear_modulus)
+    )**2
+    )
+    
+    tss = np.sum(
+    (
+        np.log10(dynamic_shear_modulus)
+        -
+        np.mean(
+            np.log10(dynamic_shear_modulus)
+        )
+    )**2
+    )
+    
+    r2_ca = 1 - rss/tss
+    rmse_ca = np.sqrt(
+    np.mean(
+        (
+            np.log10(dynamic_shear_modulus)
+            -
+            np.log10(predicted_dynamic_shear_modulus)
+        )**2
+    )
+    )
+    
+    
+    return {
+    "beta": result_CA.x[0],
+    "logOmegaC": result_CA.x[1],
+    "reduced_omega": reduced_omega,
+    "dynamic_shear_modulus": dynamic_shear_modulus,
+    "newomega": newomega,
+    "newG_CA": newG_CA,
+    "newphase_CA": newphase_CA,
+    "result": result_CA,
+    "r2": r2_ca,
+    "rmse": rmse_ca,
+    "success": result_CA.success,
+    "message": result_CA.message,
+}
+
+
+
+# Function to create plots-------------------------------------------------------------------
 def create_plot(data):
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
     ax.plot(data['Time (s)'], data['Sc (MPa)'],label='Estimated', linestyle='-')
@@ -156,6 +418,203 @@ def create_plot(data):
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels)
     return fig
+
+def create_arrhenius_plot(
+    temperature_list,
+    shift_factor_values,
+    arrhenius_values,
+    r_squared_arrhenius
+):
+
+    fig, ax = plt.subplots()
+
+    ax.plot(
+        np.array(temperature_list),
+        shift_factor_values,
+        label='Shift Factors',
+        linestyle='None',
+        marker='o'
+    )
+
+    ax.plot(
+        np.array(temperature_list),
+        arrhenius_values,
+        label='Arrhenius Model',
+        linestyle='-',
+        marker='None'
+    )
+
+    ax.set_title('Shift Factor vs Temperature')
+    ax.set_xlabel('Temperature (°C)')
+    ax.set_ylabel('Shift Factor')
+    ax.set_yscale('log')
+
+    fig.text(
+        0.50,
+        0.60,
+        'ln$a_T$ = ($E_a$/R)(1/$T$-1/$T_{ref}$)'
+    )
+
+    fig.text(
+        0.50,
+        0.55,
+        f'$r^2$ = {round(r_squared_arrhenius, 3)}'
+    )
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels)
+
+    return fig
+
+def create_master_curve_plot(master_curve_series):
+
+    fig, ax = plt.subplots()
+
+    for curve in master_curve_series:
+
+        ax.plot(
+            curve["time"],
+            curve["stiffness"],
+            label=f'{curve["temperature"]} °C',
+            linestyle='-',
+            linewidth=5.0,
+            alpha=0.4,
+            marker='o'
+        )
+
+    ax.set_title('Plot of Stiffness Master Curve vs Reduced Time')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Stiffness (MPa)')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels)
+
+    return fig
+
+
+def create_gpl_plot(
+    reduced_time_list,
+    creep_comp_list,
+    newtime,
+    newcreepcom,
+    r2_gpl,
+    rmse_log
+):
+
+    fig, ax = plt.subplots()
+
+    ax.plot(
+        reduced_time_list,
+        creep_comp_list,
+        label='Master Curve',
+        linestyle='None',
+        marker='o'
+    )
+
+    ax.plot(
+        newtime,
+        newcreepcom,
+        label='GPL Model',
+        linestyle='-',
+        marker='None'
+    )
+
+    ax.set_title(
+        'Plot of Creep Compliance vs Reduced Time'
+    )
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Creep Compliance (1/MPa)')
+
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+
+    fig.text(
+        0.20,
+        0.60,
+        'D(t) = $D_{0}$ + $D_{1}$.$t^m$'
+    )
+    fig.text(
+    0.20,
+    0.55,
+    f'$R^2$ = {r2_gpl:.4f}'
+    )
+
+    fig.text(
+    0.20,
+    0.50,
+    f'RMSE(log) = {rmse_log:.4f}'
+    )
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels)
+
+    return fig
+
+def create_ca_plot(
+    reduced_omega,
+    dynamic_shear_modulus,
+    newomega,
+    newG_CA,
+    r2_ca,
+    rmse_ca
+):
+
+    fig, ax = plt.subplots()
+
+    ax.plot(
+        reduced_omega,
+        dynamic_shear_modulus,
+        label='Master Curve',
+        linestyle='None',
+        marker='o'
+    )
+
+    ax.plot(
+        newomega,
+        newG_CA,
+        label='CA Model',
+        linestyle='-',
+        marker='None'
+    )
+
+    ax.set_title(
+        'Plot of |G*| vs Reduced Angular Frequency'
+    )
+
+    ax.set_xlabel('ω (Rad/s)')
+    ax.set_ylabel('|G*| (MPa)')
+
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+
+    fig.text(
+        0.20,
+        0.65,
+        '|G*| = $G_{g}$[1+($ω_{C}$/ω)$^{β}$]$^{(-1/β)}$'
+    )
+    
+    fig.text(
+    0.20,
+    0.60,
+    f'$R^2$ = {r2_ca:.4f}'
+    )
+
+    fig.text(
+    0.20,
+    0.55,
+    f'RMSE(log) = {rmse_ca:.4f}'
+    )
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels)
+
+    return fig
+
+#-----------------------------------------------------------------
+
 
 
 def stiffness(T1, allresults):
@@ -291,7 +750,8 @@ def count_lines(file):
 st.title("BBRtoDSR Data Processor (beta release)")
 
 st.logo(
-    "icon.png", size="large")
+    "icon.png", size="large"
+)
 
 
 # Create a sidebar
@@ -328,9 +788,10 @@ poissons_ratio = st.sidebar.slider(
     help="Adjust the Poisson's ratio between 0.25 and 0.5"  # Optional help text
 )
 
-generate_animation = st.sidebar.checkbox(
-    "Generate master curve animation"
-)
+#optimize_glassy_modulus = st.sidebar.checkbox(
+#    f"Optimize glassy shear modulus ($G_{'g'}$)",
+#    value=False
+#)
 
 glassy_modulus = st.sidebar.number_input(
     f"Glassy Shear Modulus ($G_{'g'}$) in MPa",
@@ -339,6 +800,10 @@ glassy_modulus = st.sidebar.number_input(
     value=float(DEFAULT_GLASSY_MODULUS_MPA),
     step=100.0,
     help="Glassy shear modulus used in the Christensen-Anderson model."
+)
+
+generate_animation = st.sidebar.checkbox(
+    "Generate master curve animation"
 )
 
 st.sidebar.markdown("""---""")
@@ -365,6 +830,7 @@ st.sidebar.markdown("""
 
 </style>
 """, unsafe_allow_html=True)
+
 
 st.image("BBRtoDSRv1.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
@@ -537,75 +1003,32 @@ if st.button("Give me the DSR Results !"):
             st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
             st.write(f"**$Δ T_{'c'}$: {Delta_Tc} °C**")
 
-
             st.markdown("""---""")
-
         
             st.subheader("**Time-temperature Superposition, Shift factor using Arrhenius law**")
             
             st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {allresults['Temperature (C)'][0]} °C**")           
-                      
+           
+            tts = compute_tts(allresults)
             
-            a_T_list = []
-            master_curve_series = []
-            shift_data = []
+            a_T_list = tts["a_T_list"]
+            temperatures = tts["temperatures"]         
+            reduced_time_list = tts["reduced_time_list"]
+            stiffness_list = tts["stiffness_list"]
+            shift_data = tts["shift_data"]
+            master_curve_series = tts["master_curve_series"]
+            slope4 = tts["slope4"]
+            r_squared_Arrhenius = tts["r_squared_Arrhenius"]
+            shift_factor_values = tts["shift_factor_values"]
+            arrhenius_values = tts["arrhenius_values"]
             
-            Temperature_list = [allresults['Temperature (C)'][0]]
-            reduced_time_list = BBR_TIMES.tolist()
-            stiffness_list = list(stiffness(allresults['Temperature (C)'][0], allresults).iloc[0,:])
-            
-            master_curve_series.append({
-                "temperature": allresults['Temperature (C)'][0],
-                "time": BBR_TIMES,
-                "stiffness": stiffness(
-                    allresults['Temperature (C)'][0],
-                    allresults
-                ).iloc[0,:]
-            })
-            
-            
-            for i in range(1,len(allresults)):
-                fixed_T1 = allresults['Temperature (C)'][i-1]
-                fixed_T2 = allresults['Temperature (C)'][i]
-                initial_x = [np.log10(7200/60)*(1/celsius_to_kelvin(fixed_T2)-1/celsius_to_kelvin(fixed_T1))/(
-                    1/(-10+celsius_to_kelvin(fixed_T1))-1/(celsius_to_kelvin(fixed_T1)))]
-                result = minimize(shift_factor_objective,
-                                  initial_x,
-                                  args=(fixed_T1, fixed_T2, allresults))
-                
-                
-                a_T_list.append(result.x[0])
-                Temperature_list.append(allresults['Temperature (C)'][i])
-                reduced_time_list.extend(BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]))
-                stiffness_list.extend(stiffness(allresults['Temperature (C)'][i], allresults).iloc[0,:])
-                
-                shift_data.append({
-                    "temperature": allresults['Temperature (C)'][i],
-                    "shift_factor": result.x[0],
-                    "cumulative_shift": np.cumsum(a_T_list)[i-1]
-                })
-                
-                
-                master_curve_series.append({
-                    "temperature": allresults['Temperature (C)'][i],
-                    "time": BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]),
-                    "stiffness": stiffness(
-                        allresults['Temperature (C)'][i],
-                        allresults
-                    ).iloc[0,:]
-                })
-                      
-            Trans_temp = np.array([1/celsius_to_kelvin(x)-1/celsius_to_kelvin(Temperature_list[0]) for x in Temperature_list])
-            logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
-            
-            slope4, intercept4 = linear_regression(Trans_temp, logaT_arr, proportional=True)
-
-            predicted_logaT_arr = [slope4 * xi + intercept4 for xi in Trans_temp]
-            
-            rss = sum((yi - y_pred) ** 2 for yi, y_pred in zip(logaT_arr, predicted_logaT_arr))
-            mean_y = sum(logaT_arr) / len(logaT_arr)
-            tss = sum((yi - mean_y) ** 2 for yi in logaT_arr)
-            r_squared_Arrhenius = 1 - rss / tss
+            activation_energy = (
+                                    tts["slope4"]
+                                    * np.log(10)
+                                    * GAS_CONSTANT
+                                    / 1000
+                                )
+           
 
             for item in shift_data:
 
@@ -613,152 +1036,117 @@ if st.button("Give me the DSR Results !"):
                     f"**$loga_{{T={item['temperature']:.1f}°C}}$: "
                     f"{item['cumulative_shift']:.2f}**"
                 )
-
-
-
-            fig4, ax4 = plt.subplots()
-            ax4.plot(np.array(Temperature_list), 10**logaT_arr, label='Shift Factors', 
-                     linestyle='None',
-                     marker='o')
-                     
-            ax4.plot(np.array(Temperature_list),10**(slope4*Trans_temp),label='Arrhenius Model',linestyle='-',marker='None')
+                
             
-            ax4.set_title('Shift Factor vs Temperature')
-            ax4.set_xlabel('Temperature (°C)')
-            ax4.set_ylabel('Shift Factor')
-            ax4.set_yscale('log')
-        
-            plt.figtext(0.50, 0.60, f'ln$a_{"T"}$ = ($E_{"a"}$/R)(1/$T$-1/$T_{{{"ref"}}}$)' )
-            plt.figtext(0.50, 0.55, f'$r^{2}$ = {round(r_squared_Arrhenius,3)}' )
-        
-            handles4, labels4 = ax4.get_legend_handles_labels()
-            ax4.legend(handles4, labels4)
-            st.pyplot(fig4)
+            arrhenius_fig = create_arrhenius_plot(
+                                            temperatures,
+                                            shift_factor_values,
+                                            arrhenius_values,
+                                            r_squared_Arrhenius
+                                        )
+            st.pyplot(arrhenius_fig)
             
-            st.write(f"**$E_{'a'}$: {round(slope4*np.log(10)*GAS_CONSTANT/1000,3)} kJ/mol**")
+            st.write(f"**$E_{'a'}$: {round(activation_energy, 3)} kJ/mol**")
             st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$**")
             st.write("**Please note that the temperature is converted to Kelvin, and 'ln' in the function refers to the natural logarithm.**")
             st.write(f"**An $r^{2}$ value below 0.98 raises concerns and warrants rechecking the BBR test data.**")
-        
             
             st.markdown("""---""")
             
-            fig1, ax1 = plt.subplots()
-            for curve in master_curve_series:
-
-                ax1.plot(
-                    curve["time"],
-                    curve["stiffness"],
-                    label=f'{curve["temperature"]} °C',
-                    linestyle='-',
-                    linewidth=5.0,
-                    alpha=0.4,
-                    marker='o'
-                )
-            
-            ax1.set_title('Plot of Stiffness Master Curve vs Reduced Time')
-            ax1.set_xlabel('Time (s)')
-            ax1.set_ylabel('Stiffness (MPa)')
-            ax1.set_xscale('log')
-            ax1.set_yscale('log')
-            handles1, labels1 = ax1.get_legend_handles_labels()
-            ax1.legend(handles1, labels1)
-            st.pyplot(fig1)
+            master_curve_fig = create_master_curve_plot(master_curve_series)
+            st.pyplot(master_curve_fig)
 
             st.markdown("""---""")
             st.subheader("**Creep Compliance Master Curve, Generalized Power Law (GPL)**")
-            creep_comp_list = [1/i for i in stiffness_list]
-            reduced_time = np.array(reduced_time_list)
-            creep_compliance = np.array(creep_comp_list)
+            
+            gpl = compute_gpl(
+                                reduced_time_list,
+                                stiffness_list
+                             )
+            m = gpl["m"]
+            logD0 = gpl["logD0"]
+            logD1 = gpl["logD1"]
+            
+            creep_comp_list = gpl["creep_comp_list"]
+            reduced_time = gpl["reduced_time"]
+            creep_compliance = gpl["creep_compliance"]
+            newtime = gpl["newtime"]
+            newcreepcom = gpl["newcreepcom"]
+            
+            r2_gpl = gpl["r2"]
+            rmse_log = gpl["rmse_log"]
+            
+            
+            if not gpl["success"] and r2_gpl < 0.99:
+                st.warning(f"GPL optimizer message: {gpl['message']}")
+            
+            
+            st.write(f"**m: {round(m,3)}**")
+            st.write(f"**log$D_{0}$: {round(logD0,3)}**")
+            st.write(f"**log$D_{1}$: {round(logD1,3)}**")
 
-            
-            
-            initial_data = [0.3,-2,-3]
-            
-            result_gpl = minimize(
-                                    gpl_objective,
-                                    initial_data,
-                                    args=(
-                                        reduced_time,
-                                        creep_compliance
-                                    )
-                                )
-            
-            
-            newtime = 10**np.linspace(np.log10(reduced_time).min(),np.log10(reduced_time).max(),50)
-            newcreepcom = 10**result_gpl.x[1] + 10**result_gpl.x[2] * newtime**result_gpl.x[0]
-            
-            
-            st.write(f"**m: {round(result_gpl.x[0],3)}**")
-            st.write(f"**log$D_{0}$: {round(result_gpl.x[1],3)}**")
-            st.write(f"**log$D_{1}$: {round(result_gpl.x[2],3)}**")
-            
-            
-            fig2, ax2 = plt.subplots()
-            ax2.plot(reduced_time_list, creep_comp_list,label='Master Curve', 
-                     linestyle='None',
-                     marker='o')
-            ax2.plot(newtime,newcreepcom,label='GPL Model',linestyle='-',marker='None')
-            ax2.set_title('Plot of Creep Compliance vs Reduced Time')
-            ax2.set_xlabel('Time (s)')
-            ax2.set_ylabel('Creep Compliance (1/MPa)')
-            ax2.set_xscale('log')
-            ax2.set_yscale('log')
-            plt.figtext(0.20, 0.60, 'D(t) = $D_{0}$ + $D_{1}$.$t^m$' )
-            handles2, labels2 = ax2.get_legend_handles_labels()
-            ax2.legend(handles2, labels2)
-            st.pyplot(fig2)
+            gpl_fig = create_gpl_plot(
+                    reduced_time_list,
+                    creep_comp_list,
+                    newtime,
+                    newcreepcom,
+                    round(r2_gpl, 4),
+                    round(rmse_log, 4)
+                )
+                
+            st.pyplot(gpl_fig)
+
 
             st.markdown("""---""")
             st.subheader("**Complex Modulus Master Curve, Christensen–Anderson (CA) Model**")
-
-            reduced_omega = 2/(np.pi*reduced_time)
-            storage_compliance = (10**result_gpl.x[1]) + (10**result_gpl.x[2]) * math.gamma(1+result_gpl.x[0]) * (reduced_omega)**(-result_gpl.x[0]) * np.cos(result_gpl.x[0] * np.pi/2)
-            loss_compliance = (10**result_gpl.x[2]) * math.gamma(1+result_gpl.x[0]) * (reduced_omega)**(-result_gpl.x[0]) * np.sin(result_gpl.x[0] * np.pi/2)
-            dynamic_compliance = (storage_compliance**2 + loss_compliance**2)**0.5
-            dynamic_modulus = 1/dynamic_compliance
-            dynamic_shear_modulus = dynamic_modulus/(2*(1+poissons_ratio))
             
-            initial_data_CA = [0.1,-3]
+            ca = compute_ca(
+                reduced_time,
+                logD0,
+                logD1,
+                m,
+                poissons_ratio,
+                glassy_modulus
+            )
             
-            result_CA = minimize(
-                                ca_objective,
-                                initial_data_CA,
-                                args=(
-                                    reduced_omega,
-                                    dynamic_shear_modulus,
-                                    glassy_modulus
-                            
-                                )
-                            )
+            beta = ca["beta"]
+            logOmegaC = ca["logOmegaC"]
+            reduced_omega = ca["reduced_omega"]
+            dynamic_shear_modulus = ca["dynamic_shear_modulus"]
+            newomega = ca["newomega"]
+            newG_CA = ca["newG_CA"]
+            newphase_CA = ca["newphase_CA"]
+            r2_CA = ca["r2"]
+            rmse_CA = ca["rmse"]
             
-            newomega = 10**np.linspace(np.log10(reduced_omega).min(),np.log10(reduced_omega).max(),50)
-            newG_CA = glassy_modulus*(1+(10**result_CA.x[1]/newomega)**result_CA.x[0])**(-1/result_CA.x[0])
-            newphase_CA = 90/(1+(newomega/(10**result_CA.x[1]))**result_CA.x[0])
             
-            st.write(f"**β: {round(result_CA.x[0],3)}**")
-            st.write(f"**log$ω_{'C'}$: {round(result_CA.x[1],3)} at $T_{{{"ref"}}}$**")
+            logomega_C_zero = np.log10((10**logOmegaC)*(10**(slope4*(1/celsius_to_kelvin(0)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))))
+            
+            if not ca["success"] and r2_CA < 0.99:
+                st.warning(f"CA optimizer message: {ca['message']}")
+            
+            
+            st.write(f"**β: {round(beta,3)}**")
+            st.write(f"**log$ω_{'C'}$: {round(logOmegaC,3)} at $T_{{{"ref"}}}$**")
         
-            logomega_C_zero = np.log10((10**result_CA.x[1])*(10**(slope4*(1/celsius_to_kelvin(0)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))))
 
             st.write(f"**log$ω_{'C'}$: {round(logomega_C_zero,3)} at 0°C**")
+            st.write(f"**Rheological Index: {round(np.log10(2)/beta, 2)}**")
                         
-            fig5, ax5 = plt.subplots()
-            ax5.plot(reduced_omega, dynamic_shear_modulus,label='Master Curve', 
-                     linestyle='None',
-                     marker='o')
-            ax5.plot(newomega,newG_CA,label='CA Model',linestyle='-',marker='None')
-            ax5.set_title('Plot of |G*| vs Reduced Angular Frequency')
-            ax5.set_xlabel('ω (Rad/s)')
-            ax5.set_ylabel('|G*| (MPa)')
-            ax5.set_xscale('log')
-            ax5.set_yscale('log')
-            plt.figtext(0.20, 0.60, f'|G*| = $G_{"g"}$[1+($ω_{"C"}$/ω$)^{"β"}$$]^{{{"(-1/β)"}}}$')
-            handles5, labels5 = ax5.get_legend_handles_labels()
-            ax5.legend(handles5, labels5)
-            st.pyplot(fig5)
+            
+            ca_fig = create_ca_plot(
+                reduced_omega,
+                dynamic_shear_modulus,
+                newomega,
+                newG_CA,
+                r2_CA,
+                rmse_CA
+            )
+            
+            st.pyplot(ca_fig)
+
         
-            st.write(f"**Rheological Index: {round(np.log10(2)/result_CA.x[0],2)}**")
+            
             st.write(f"**The glassy modulus ($G_{'g'}$) was assumed to be a constant value of {glassy_modulus/1000: .1f} GPa.**")
         
 
@@ -768,8 +1156,8 @@ if st.button("Give me the DSR Results !"):
         
             omega_GR = 0.005
             omega_GR_reduced = omega_GR * 10**(slope4*(1/celsius_to_kelvin(15)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
-            phase_GR = 90/(1+(omega_GR_reduced/(10**result_CA.x[1]))**result_CA.x[0])
-            G_GR = 1000*glassy_modulus*(1+(10**result_CA.x[1]/omega_GR_reduced)**result_CA.x[0])**(-1/result_CA.x[0])
+            phase_GR = 90/(1+(omega_GR_reduced/(10**logOmegaC))**beta)
+            G_GR = 1000*glassy_modulus*(1+(10**logOmegaC/omega_GR_reduced)**beta)**(-1/beta)
             
             G_R = (G_GR/(np.sin(np.radians(phase_GR))))*(np.cos(np.radians(phase_GR)))**2
 
@@ -805,8 +1193,8 @@ if st.button("Give me the DSR Results !"):
                     FATIGUE_LIMIT,
                     slope4,
                     allresults['Temperature (C)'][0],
-                    result_CA.x[0],
-                    result_CA.x[1],
+                    beta,
+                    logOmegaC,
                     glassy_modulus
                 )
             )
@@ -821,8 +1209,8 @@ if st.button("Give me the DSR Results !"):
                                                 FATIGUE_LIMIT_ALT,
                                                 slope4,
                                                 allresults['Temperature (C)'][0],
-                                                result_CA.x[0],
-                                                result_CA.x[1],
+                                                beta,
+                                                logOmegaC,
                                                 glassy_modulus
                                             )
                                         )
@@ -831,14 +1219,14 @@ if st.button("Give me the DSR Results !"):
 
             omega_fatigue6_superpave = 10
             omega_fatigue6_superpave_reduced = omega_fatigue6_superpave * 10**(slope4*(1/celsius_to_kelvin(result_T_fatigue_6000.x[0])-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
-            phase_fatigue6 = 90/(1+(omega_fatigue6_superpave_reduced/(10**result_CA.x[1]))**result_CA.x[0])
+            phase_fatigue6 = 90/(1+(omega_fatigue6_superpave_reduced/(10**logOmegaC))**beta)
 
             st.write(f"**$δ_{{{'G"=6000kPa'}}}$: {round(phase_fatigue6,1)} °**")
         
             Temperature_fatigue_list = np.array([4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 40])
             Omega_fatigue_list = 10 * 10**(slope4*(1/celsius_to_kelvin(Temperature_fatigue_list)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
-            phase_fatigue_list = 90/(1+(Omega_fatigue_list/(10**result_CA.x[1]))**result_CA.x[0])
-            G_fatigue_list = 1000*glassy_modulus*(1+(10**result_CA.x[1]/Omega_fatigue_list)**result_CA.x[0])**(-1/result_CA.x[0])
+            phase_fatigue_list = 90/(1+(Omega_fatigue_list/(10**logOmegaC))**beta)
+            G_fatigue_list = 1000*glassy_modulus*(1+(10**logOmegaC/Omega_fatigue_list)**beta)**(-1/beta)
             G_storage_fatigue_list = G_fatigue_list * np.cos(np.radians(phase_fatigue_list))
             G_loss_fatigue_list = G_fatigue_list * np.sin(np.radians(phase_fatigue_list))
             
@@ -882,14 +1270,14 @@ if st.button("Give me the DSR Results !"):
                                             args=(
                                                 slope4,
                                                 allresults['Temperature (C)'][0],
-                                                result_CA.x[0],
-                                                result_CA.x[1],
+                                                beta,
+                                                logOmegaC,
                                                 glassy_modulus
                                             )
                                         )
         
             Omega_pavel_kriz = 10 * 10**(slope4*(1/celsius_to_kelvin(result_T_pavel_kriz.x[0])-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))
-            phase_pavel_kriz = 90/(1+(Omega_pavel_kriz/(10**result_CA.x[1]))**result_CA.x[0])
+            phase_pavel_kriz = 90/(1+(Omega_pavel_kriz/(10**logOmegaC))**beta)
 
             st.write("ω = 10 Rad/s")
             st.write(f"T = {round(result_T_pavel_kriz.x[0],1)} °C")
