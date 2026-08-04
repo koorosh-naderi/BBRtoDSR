@@ -18,6 +18,7 @@ from statistics import linear_regression
 import math
 import tempfile
 import os
+from dataclasses import dataclass
 
 #magic numbers
 
@@ -56,21 +57,28 @@ RI_LINES = np.arange(1,4.5,0.5)
 
 #-----------------------------------------------------------------
 
+@dataclass
+class BBRLoadResult:
+    bbr_data: pd.DataFrame
+    bbr_fit_points: pd.DataFrame
+    bbr_fit_model: np.poly1d
+    target_temperature: float
+    actual_temperature: float
+
 def create_load_result(
-    data,
-    results,
-    model,
+    bbr_data,
+    bbr_fit_points,
+    bbr_fit_model,
     target_temperature,
     actual_temperature
 ):
-
-    return {
-        "data": data,
-        "results": results,
-        "model": model,
-        "target_temperature": target_temperature,
-        "actual_temperature": actual_temperature
-    }
+    return BBRLoadResult(
+        bbr_data=bbr_data,
+        bbr_fit_points=bbr_fit_points,
+        bbr_fit_model=bbr_fit_model,
+        target_temperature=target_temperature,
+        actual_temperature=actual_temperature
+    )
 
 
 def load_csv(uploaded_file):
@@ -85,21 +93,21 @@ def load_csv(uploaded_file):
             header=None,engine='python',names=range(1,6))
     
         info = df.iloc[0:9,0:2]
-        data = df.iloc[9:,:].dropna(axis=1)
-        data.columns = data.iloc[0]
-        data = data[1:]
-        data.reset_index(drop=True,inplace=True)
-        data = data.rename_axis(None, axis=1)
+        bbr_data = df.iloc[9:,:].dropna(axis=1)
+        bbr_data.columns = bbr_data.iloc[0]
+        bbr_data = bbr_data[1:]
+        bbr_data.reset_index(drop=True,inplace=True)
+        bbr_data = bbr_data.rename_axis(None, axis=1)
         beam_span = np.float64(info[2][6])/1000
         beam_width = np.float64(info[2][7])/1000
         beam_thickness = np.float64(info[2][8])/1000
-        data['Stiffness (MPa)'] = 1/1000000*(np.float64(data['Force (mN)'])*beam_span**3)/(np.float64(data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
+        bbr_data['Stiffness (MPa)'] = 1/1000000*(np.float64(bbr_data['Force (mN)'])*beam_span**3)/(np.float64(bbr_data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
         target_temperature = np.float64(info[2][4])
         
-        data, results, model = fit_bbr_curve(data)
+        bbr_data, bbr_fit_points, bbr_fit_model = fit_bbr_curve(bbr_data)
         
         
-        actual_temperature = np.float64(results['Temperature (C)']).mean()
+        actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
             
     elif num_lines==44:    
        
@@ -107,17 +115,17 @@ def load_csv(uploaded_file):
         uploaded_file.seek(0)
         dfhead = pd.read_csv(uploaded_file,header=None,engine='python', encoding='unicode_escape',nrows=36,index_col=False)
         
-        data = pd.DataFrame()
-        data['Time (s)'] = df[0]
-        data['Force (mN)'] = df[1]
-        data['Deflection (mm)'] = df[2]
-        data['Temperature (C)'] = dfhead.iloc[6,1]
-        data['Stiffness (MPa)'] = df[3]
+        bbr_data = pd.DataFrame()
+        bbr_data['Time (s)'] = df[0]
+        bbr_data['Force (mN)'] = df[1]
+        bbr_data['Deflection (mm)'] = df[2]
+        bbr_data['Temperature (C)'] = dfhead.iloc[6,1]
+        bbr_data['Stiffness (MPa)'] = df[3]
         target_temperature = np.float64(dfhead.iloc[6,1])
         
-        data, results, model = fit_bbr_curve(data)
+        bbr_data, bbr_fit_points, bbr_fit_model = fit_bbr_curve(bbr_data)
         
-        actual_temperature = np.float64(results['Temperature (C)']).mean()
+        actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
         
     else:
         raise ValueError(
@@ -125,9 +133,9 @@ def load_csv(uploaded_file):
         )
         
     return create_load_result(
-                                        data,
-                                        results,
-                                        model,
+                                        bbr_data,
+                                        bbr_fit_points,
+                                        bbr_fit_model,
                                         target_temperature,
                                         actual_temperature
                                     )
@@ -142,27 +150,27 @@ def load_xlsm(uploaded_file):
     df = pd.read_excel(uploaded_file, sheet_name=sheet_name, engine="openpyxl", skiprows=start_row-1,header=None)
     full_sheet = pd.read_excel(uploaded_file, sheet_name=sheet_name, engine="openpyxl", header=None)
         
-    data = pd.DataFrame()
-    data['Time (s)'] = df[0]
-    data['Force (mN)'] = df[1]*1000
-    data['Deflection (mm)'] = df[2]
-    data['Temperature (C)'] = df[3]
+    bbr_data = pd.DataFrame()
+    bbr_data['Time (s)'] = df[0]
+    bbr_data['Force (mN)'] = df[1]*1000
+    bbr_data['Deflection (mm)'] = df[2]
+    bbr_data['Temperature (C)'] = df[3]
     
     beam_span = np.float64(full_sheet.iloc[29,2])/1000
     beam_width = np.float64(full_sheet.iloc[19,8])/1000
     beam_thickness = np.float64(full_sheet.iloc[20,8])/1000
     target_temperature = np.float64(full_sheet.iloc[28,2])
     
-    data['Stiffness (MPa)'] = 1/1000000*(np.float64(data['Force (mN)'])*beam_span**3)/(np.float64(data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
+    bbr_data['Stiffness (MPa)'] = 1/1000000*(np.float64(bbr_data['Force (mN)'])*beam_span**3)/(np.float64(bbr_data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
     
-    data, results, model = fit_bbr_curve(data)
+    bbr_data, bbr_fit_points, bbr_fit_model = fit_bbr_curve(bbr_data)
     
-    actual_temperature = np.float64(results['Temperature (C)']).mean()
+    actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
     
     return create_load_result(
-                                data,
-                                results,
-                                model,
+                                bbr_data,
+                                bbr_fit_points,
+                                bbr_fit_model,
                                 target_temperature,
                                 actual_temperature
                                 )
@@ -210,33 +218,33 @@ def find_bracketing_rows(df, column_name, target_value):
         return closest_rows
 
 
-def calculate_low_temperature_properties(allresults):
-    ddf1 = find_bracketing_rows(
-        allresults,
+def calculate_low_temperature_properties(bbr_temperature_results):
+    m_value_bracketing_rows = find_bracketing_rows(
+        bbr_temperature_results,
         'm-value(60)',
         M_VALUE_LIMIT)
 
-    ddf2 = find_bracketing_rows(
-        allresults,
+    stiffness_bracketing_rows = find_bracketing_rows(
+        bbr_temperature_results,
         'S(60)',
         STIFFNESS_LIMIT)
 
-    slope1, intercept1, _, _, _ = stats.linregress(
-        ddf1['m-value(60)'],
-        ddf1['Temperature (C)'])
+    m_value_slope, m_value_intercept, _, _, _ = stats.linregress(
+        m_value_bracketing_rows['m-value(60)'],
+        m_value_bracketing_rows['Temperature (C)'])
 
-    slope2, intercept2, _, _, _ = stats.linregress(
-        np.log(ddf2['S(60)']),
-        ddf2['Temperature (C)'])
+    stiffness_slope, stiffness_intercept, _, _, _ = stats.linregress(
+        np.log(stiffness_bracketing_rows['S(60)']),
+        stiffness_bracketing_rows['Temperature (C)'])
 
     T_s = round(
-        -10 + slope2 * np.log(STIFFNESS_LIMIT)
-        + intercept2,
+        -10 + stiffness_slope * np.log(STIFFNESS_LIMIT)
+        + stiffness_intercept,
         1)
 
     T_m = round(
-        -10 + slope1 * M_VALUE_LIMIT
-        + intercept1,
+        -10 + m_value_slope * M_VALUE_LIMIT
+        + m_value_intercept,
         1)
 
     Delta_Tc = round(
@@ -247,110 +255,134 @@ def calculate_low_temperature_properties(allresults):
         "Tc_S": T_s,
         "Tc_m": T_m,
         "Delta_Tc": Delta_Tc,
-        "slope1": slope1,
-        "intercept1": intercept1,
-        "slope2": slope2,
-        "intercept2": intercept2,
-        "ddf1": ddf1,
-        "ddf2": ddf2
+        "m_value_slope": m_value_slope,
+        "m_value_intercept": m_value_intercept,
+        "stiffness_slope": stiffness_slope,
+        "stiffness_intercept": stiffness_intercept,
+        "m_value_bracketing_rows": m_value_bracketing_rows,
+        "stiffness_bracketing_rows": stiffness_bracketing_rows
     }
 
 
 def celsius_to_kelvin(temp_c):
     return temp_c + KELVIN_OFFSET
 
-def fit_bbr_curve(data):
-    data = data.copy()
-    data['Time (s)'] = pd.to_numeric(data['Time (s)'], errors='coerce')
-    data['log(t)'] = np.log10(
-        np.float64(data['Time (s)']))
-    data['log(S)'] = np.log10(
-        data['Stiffness (MPa)'])
-    results = data[
-    data['Time (s)'].isin(
+def fit_bbr_curve(bbr_data):
+    bbr_data = bbr_data.copy()
+    bbr_data['Time (s)'] = pd.to_numeric(bbr_data['Time (s)'], errors='coerce')
+    bbr_data['log(t)'] = np.log10(
+        np.float64(bbr_data['Time (s)']))
+    bbr_data['log(S)'] = np.log10(
+        bbr_data['Stiffness (MPa)'])
+    bbr_fit_points = bbr_data[
+    bbr_data['Time (s)'].isin(
             BBR_TIMES)]
-    model = np.poly1d(
+    bbr_fit_model = np.poly1d(
         np.polyfit(
-            results['log(t)'],
-            results['log(S)'],
+            bbr_fit_points['log(t)'],
+            bbr_fit_points['log(S)'],
             2))
-    data['Sc (MPa)'] = 10**(
-    model(data['log(t)']))
-    data['Percent diff'] = (
-        data['Stiffness (MPa)']
-        - data['Sc (MPa)']
-    ) / data['Stiffness (MPa)'] * 100
-    data['m-value'] = np.abs(
-        2*model.coefficients[0]
-        * data['log(t)']
-        + model.coefficients[1])
-    results = data[data['Time (s)'].isin(BBR_TIMES)]
-    return data, results, model
+    bbr_data['Sc (MPa)'] = 10**(
+    bbr_fit_model(bbr_data['log(t)']))
+    bbr_data['Percent diff'] = (
+        bbr_data['Stiffness (MPa)']
+        - bbr_data['Sc (MPa)']
+    ) / bbr_data['Stiffness (MPa)'] * 100
+    bbr_data['m-value'] = np.abs(
+        2*bbr_fit_model.coefficients[0]
+        * bbr_data['log(t)']
+        + bbr_fit_model.coefficients[1])
+    bbr_fit_points = bbr_data[bbr_data['Time (s)'].isin(BBR_TIMES)]
+    return bbr_data, bbr_fit_points, bbr_fit_model
 
+@dataclass
+class TTSResult:
+    a_T_list: list
+    temperatures: list
+    reduced_time_list: list
+    stiffness_list: list
+    shift_data: list
+    master_curve_series: list
+    arrhenius_slope: float
+    r_squared_Arrhenius: float
+    shift_factor_values: np.ndarray
+    arrhenius_values: np.ndarray
 
-def compute_tts(allresults):
+def compute_tts(bbr_temperature_results):
 
     a_T_list = []
     master_curve_series = []
     shift_data = []
+    
+    reference_temperature = (
+    bbr_temperature_results.loc[0, 'Temperature (C)']
+    )
 
-    temperatures = [allresults['Temperature (C)'][0]]
+    temperatures = [reference_temperature]
 
     reduced_time_list = BBR_TIMES.tolist()
 
     stiffness_list = list(
-        stiffness(
-            allresults['Temperature (C)'][0],
-            allresults
+        calculate_stiffness_curve(
+            reference_temperature,
+            bbr_temperature_results
         ).iloc[0,:]
     )
 
     master_curve_series.append({
-        "temperature": allresults['Temperature (C)'][0],
+        "temperature": reference_temperature,
         "time": BBR_TIMES,
-        "stiffness": stiffness(
-            allresults['Temperature (C)'][0],
-            allresults
+        "stiffness": calculate_stiffness_curve(
+            reference_temperature,
+            bbr_temperature_results
         ).iloc[0,:]
     })
 
     
-    for i in range(1,len(allresults)):
-        fixed_T1 = allresults['Temperature (C)'][i-1]
-        fixed_T2 = allresults['Temperature (C)'][i]
+    for i in range(1,len(bbr_temperature_results)):
+        fixed_T1 = bbr_temperature_results.loc[i-1, 'Temperature (C)']
+        fixed_T2 = bbr_temperature_results.loc[i, 'Temperature (C)']
+        
+        current_temperature = (
+                                bbr_temperature_results.loc[i, 'Temperature (C)']
+                                )
+        
         initial_x = [np.log10(7200/60)*(1/celsius_to_kelvin(fixed_T2)-1/celsius_to_kelvin(fixed_T1))/(
             1/(-10+celsius_to_kelvin(fixed_T1))-1/(celsius_to_kelvin(fixed_T1)))]
         result = minimize(shift_factor_objective,
                           initial_x,
-                          args=(fixed_T1, fixed_T2, allresults), bounds=[(-10, 10)])
+                          args=(fixed_T1, fixed_T2, bbr_temperature_results), bounds=[(-10, 10)])
         
         
         a_T_list.append(result.x[0])
-        temperatures.append(allresults['Temperature (C)'][i])
-        reduced_time_list.extend(BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]))
-        stiffness_list.extend(stiffness(allresults['Temperature (C)'][i], allresults).iloc[0,:])
+        temperatures.append(current_temperature)
+        
+        cumulative_shift = np.cumsum(a_T_list)[i-1]
+        
+        reduced_time_list.extend(BBR_TIMES/(10**cumulative_shift))
+        stiffness_list.extend(calculate_stiffness_curve(current_temperature, bbr_temperature_results).iloc[0,:])
         
         shift_data.append({
-            "temperature": allresults['Temperature (C)'][i],
+            "temperature": current_temperature,
             "shift_factor": result.x[0],
-            "cumulative_shift": np.cumsum(a_T_list)[i-1]
+            "cumulative_shift": cumulative_shift
         })
         
         
         master_curve_series.append({
-            "temperature": allresults['Temperature (C)'][i],
-            "time": BBR_TIMES/(10**np.cumsum(a_T_list)[i-1]),
-            "stiffness": stiffness(
-                allresults['Temperature (C)'][i],
-                allresults
+            "temperature": current_temperature,
+            "time": BBR_TIMES/(10**cumulative_shift),
+            "stiffness": calculate_stiffness_curve(
+                current_temperature,
+                bbr_temperature_results
             ).iloc[0,:]
         })
     inverse_temperature_difference = np.array([1/celsius_to_kelvin(x)-1/celsius_to_kelvin(temperatures[0]) for x in temperatures])
     logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
     
-    slope4, _ = linear_regression(inverse_temperature_difference, logaT_arr, proportional=True)
+    arrhenius_slope, _ = linear_regression(inverse_temperature_difference, logaT_arr, proportional=True)
 
-    predicted_logaT_arr = [slope4 * xi for xi in inverse_temperature_difference]
+    predicted_logaT_arr = [arrhenius_slope * xi for xi in inverse_temperature_difference]
     
     rss = sum((yi - y_pred) ** 2 for yi, y_pred in zip(logaT_arr, predicted_logaT_arr))
     mean_y = sum(logaT_arr) / len(logaT_arr)
@@ -362,20 +394,22 @@ def compute_tts(allresults):
     #r_squared_Arrhenius = 1 - rss / tss
     
     shift_factor_values = 10**logaT_arr
-    arrhenius_values = 10**(slope4 * inverse_temperature_difference)
+    arrhenius_values = 10**(arrhenius_slope * inverse_temperature_difference)
 
-    return {
-    "a_T_list": a_T_list,
-    "temperatures": temperatures,
-    "reduced_time_list": reduced_time_list,
-    "stiffness_list": stiffness_list,
-    "shift_data": shift_data,
-    "master_curve_series": master_curve_series,
-    "slope4": slope4,
-    "r_squared_Arrhenius": r_squared_Arrhenius,
-    "shift_factor_values": shift_factor_values,
-    "arrhenius_values": arrhenius_values
-            }
+    return TTSResult(
+    a_T_list=a_T_list,
+    temperatures=temperatures,
+    reduced_time_list=reduced_time_list,
+    stiffness_list=stiffness_list,
+    shift_data=shift_data,
+    master_curve_series=master_curve_series,
+    arrhenius_slope=arrhenius_slope,
+    r_squared_Arrhenius=r_squared_Arrhenius,
+    shift_factor_values=shift_factor_values,
+    arrhenius_values=arrhenius_values
+                    )
+
+   
 
 def compute_gpl(
     reduced_time_list,
@@ -603,19 +637,19 @@ def compute_ca(
 
 
 def compute_gr(
-    slope4,
+    arrhenius_slope,
     Tref,
     beta,
     logOmegaC,
     glassy_modulus
 ):
     
-    omega_GR = 0.005
+    omega_gr = 0.005
 
-    omega_GR_reduced = (
-        omega_GR
+    omega_gr_reduced = (
+        omega_gr
         * 10**(
-            slope4
+            arrhenius_slope
             * (
                 1/celsius_to_kelvin(15)
                 - 1/celsius_to_kelvin(Tref)
@@ -623,9 +657,9 @@ def compute_gr(
         )
     )
 
-    phase_GR = (90/(1 + (omega_GR_reduced/(10**logOmegaC))**beta))
+    phase_gr = (90/(1 + (omega_gr_reduced/(10**logOmegaC))**beta))
 
-    G_GR = (
+    g_gr = (
         1000
         * glassy_modulus
         * (
@@ -634,28 +668,28 @@ def compute_gr(
             (
                 10**logOmegaC
                 /
-                omega_GR_reduced
+                omega_gr_reduced
             )**beta
         )**(-1/beta)
     )
 
-    G_R = (
-        G_GR
-        / np.sin(np.radians(phase_GR))
+    g_r = (
+        g_gr
+        / np.sin(np.radians(phase_gr))
     ) * (
-        np.cos(np.radians(phase_GR))
+        np.cos(np.radians(phase_gr))
     )**2
 
     return {
-        "omega_GR_reduced": omega_GR_reduced,
-        "phase_GR": phase_GR,
-        "G_GR": G_GR,
-        "G_R": G_R
+        "omega_gr_reduced": omega_gr_reduced,
+        "phase_gr": phase_gr,
+        "g_gr": g_gr,
+        "g_r": g_r
     }
 
 
 def compute_fatigue(
-    slope4,
+    arrhenius_slope,
     Tref,
     beta,
     logOmegaC,
@@ -667,7 +701,7 @@ def compute_fatigue(
         [22],
         args=(
             FATIGUE_LIMIT,
-            slope4,
+            arrhenius_slope,
             Tref,
             beta,
             logOmegaC,
@@ -680,7 +714,7 @@ def compute_fatigue(
         [22],
         args=(
             FATIGUE_LIMIT_ALT,
-            slope4,
+            arrhenius_slope,
             Tref,
             beta,
             logOmegaC,
@@ -693,7 +727,7 @@ def compute_fatigue(
     omega_fatigue6_superpave_reduced = (
         omega_fatigue6_superpave
         * 10**(
-            slope4
+            arrhenius_slope
             * (
                 1/celsius_to_kelvin(
                     result_T_fatigue_6000.x[0]
@@ -724,7 +758,7 @@ def compute_fatigue(
     Omega_fatigue_list = (
         10
         * 10**(
-            slope4
+            arrhenius_slope
             * (
                 1/celsius_to_kelvin(
                     Temperature_fatigue_list
@@ -825,7 +859,7 @@ def compute_fatigue(
     }
 
 def compute_pavel_kriz(
-    slope4,
+    arrhenius_slope,
     Tref,
     beta,
     logOmegaC,
@@ -837,7 +871,7 @@ def compute_pavel_kriz(
         pavel_kriz_objective,
         [22],
         args=(
-            slope4,
+            arrhenius_slope,
             Tref,
             beta,
             logOmegaC,
@@ -851,7 +885,7 @@ def compute_pavel_kriz(
     omega = (
         10
         * 10**(
-            slope4
+            arrhenius_slope
             * (
                 1/celsius_to_kelvin(temperature)
                 - 1/celsius_to_kelvin(Tref)
@@ -880,10 +914,27 @@ def compute_pavel_kriz(
 
 # Function to create plots-------------------------------------------------------------------
 
-def create_plot(results):
+def add_reference_temperature_label(
+    ax,
+    reference_temperature
+):
+    ax.text(
+        0.03,
+        0.97,
+        f"$T_{{{'ref'}}}$ = {reference_temperature:.1f} °C",
+        transform=ax.transAxes,
+        verticalalignment='top',
+        bbox=dict(
+            facecolor='white',
+            alpha=0.8
+        )
+    )
+
+
+def create_bbr_fit_plot(bbr_fit_points):
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
-    ax.plot(results['Time (s)'], results['Sc (MPa)'],label='Estimated', linestyle='-')
-    ax.plot(results['Time (s)'], results['Stiffness (MPa)'],label='Measured', linestyle=':', marker='o')
+    ax.plot(bbr_fit_points['Time (s)'], bbr_fit_points['Sc (MPa)'],label='Estimated', linestyle='-')
+    ax.plot(bbr_fit_points['Time (s)'], bbr_fit_points['Stiffness (MPa)'],label='Measured', linestyle=':', marker='o')
     ax.set_title('Plot of Stiffness vs Time')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Stiffness (MPa)')
@@ -940,7 +991,8 @@ def create_arrhenius_plot(
 
     return fig
 
-def create_master_curve_plot(master_curve_series):
+def create_master_curve_plot(master_curve_series,
+                             reference_temperature):
 
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
 
@@ -956,7 +1008,9 @@ def create_master_curve_plot(master_curve_series):
             marker='o'
         )
 
-    ax.set_title('Plot of Stiffness Master Curve vs Reduced Time')
+    
+    ax.set_title('Stiffness Master Curve')
+    add_reference_temperature_label(ax, reference_temperature)
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Stiffness (MPa)')
     ax.set_xscale('log')
@@ -974,7 +1028,8 @@ def create_gpl_plot(
     newtime,
     newcreepcom,
     r2_gpl,
-    rmse_log
+    rmse_log,
+    reference_temperature
 ):
 
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
@@ -994,10 +1049,9 @@ def create_gpl_plot(
         linestyle='-',
         marker='None'
     )
-
-    ax.set_title(
-        'Plot of Creep Compliance vs Reduced Time'
-    )
+    
+    ax.set_title('Creep Compliance Master Curve')
+    add_reference_temperature_label(ax, reference_temperature)
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Creep Compliance (1/MPa)')
@@ -1008,7 +1062,7 @@ def create_gpl_plot(
     fig.text(
         0.20,
         0.60,
-        'D(t) = $D_{0}$ + $D_{1}$.$t^m$'
+        '$D$($t$) = $D_{0}$ + $D_{1}$.$t^m$'
     )
     fig.text(
     0.20,
@@ -1033,7 +1087,8 @@ def create_ca_plot(
     newomega,
     newG_CA,
     r2_ca,
-    rmse_ca
+    rmse_ca,
+    reference_temperature
 ):
 
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
@@ -1054,9 +1109,9 @@ def create_ca_plot(
         marker='None'
     )
 
-    ax.set_title(
-        'Plot of |G*| vs Reduced Angular Frequency'
-    )
+    
+    ax.set_title('Complex Modulus Master Curve')
+    add_reference_temperature_label(ax, reference_temperature)
 
     ax.set_xlabel('ω (Rad/s)')
     ax.set_ylabel('|G*| (MPa)')
@@ -1088,9 +1143,9 @@ def create_ca_plot(
     return fig
 
 
-def create_gr_plot(
-    phase_GR,
-    G_GR,
+def create_glover_rowe_plot(
+    phase_gr,
+    g_gr,
     show_RI_contours=True
 ):
     
@@ -1179,8 +1234,8 @@ def create_gr_plot(
     # Existing G-R graphics
 
     ax.plot(
-        phase_GR,
-        G_GR,
+        phase_gr,
+        g_gr,
         label='G-R Parameter',
         linestyle='None',
         marker='o',
@@ -1360,7 +1415,8 @@ def create_master_curve_animation_figure(
                             movingtime,
                             movingshifts,
                             ymin,
-                            ymax
+                            ymax,
+                            reference_temperature
                            ):
 
     fig, ax = plt.subplots(dpi=200)
@@ -1384,6 +1440,8 @@ def create_master_curve_animation_figure(
     ax.set_title(
         'Plot of Stiffness Master Curve vs Reduced Time'
     )
+    
+    add_reference_temperature_label(ax, reference_temperature)
 
     ax.set_xlabel('Log Time (s)')
     ax.set_ylabel('Stiffness (MPa)')
@@ -1425,7 +1483,7 @@ def create_master_curve_animation(
 
             shifted_time = (
                 movingtime
-                - 0.01 * i * shift
+                - (i/149) * shift
             )
 
             lines[idx].set_data(
@@ -1439,7 +1497,7 @@ def create_master_curve_animation(
         fig,
         animate,
         init_func=init,
-        frames=100,
+        frames=150,
         interval=5,
         blit=True,
         
@@ -1459,7 +1517,7 @@ def render_animation_to_video(
         fname = fp.name
 
     writer = FFMpegWriter(
-        fps=25,
+        fps=75,
         metadata=dict(artist='Koorosh Naderi'),
         codec='libx264',
         extra_args=['-pix_fmt', 'yuv420p']
@@ -1487,18 +1545,18 @@ def render_animation_to_video(
 
 
 
-def stiffness(T1, allresults):
-    coeffs = allresults.loc[
-        allresults['Temperature (C)'] == T1,
+def calculate_stiffness_curve(T1, bbr_temperature_results):
+    coeffs = bbr_temperature_results.loc[
+        bbr_temperature_results['Temperature (C)'] == T1,
         ['A', 'B', 'C']]
     return 10**(coeffs @ POLY_MATRIX)
 
-def build_stiffness_cache(allresults):
+def build_stiffness_cache(bbr_temperature_results):
     stiffness_cache = []
 
-    for temp in allresults['Temperature (C)']:
+    for temp in bbr_temperature_results['Temperature (C)']:
         stiffness_cache.append(
-                               stiffness(temp, allresults)
+                               calculate_stiffness_curve(temp, bbr_temperature_results)
                                .iloc[0, :]
                                .to_numpy()
                               )
@@ -1506,13 +1564,13 @@ def build_stiffness_cache(allresults):
     return stiffness_cache
 
 
-def shift_factor_error(T1, T2, a, allresults):
-    coeffs_T1 = allresults.loc[
-        allresults['Temperature (C)'] == T1,
+def shift_factor_error(T1, T2, a, bbr_temperature_results):
+    coeffs_T1 = bbr_temperature_results.loc[
+        bbr_temperature_results['Temperature (C)'] == T1,
         ['A', 'B', 'C']]
     
-    coeffs_T2 = allresults.loc[
-        allresults['Temperature (C)'] == T2,
+    coeffs_T2 = bbr_temperature_results.loc[
+        bbr_temperature_results['Temperature (C)'] == T2,
         ['A', 'B', 'C']]
 
     stiffness_T1 = 10**(coeffs_T1@ POLY_MATRIX)
@@ -1534,12 +1592,12 @@ def shift_factor_objective(
     x,
     T1,
     T2,
-    allresults):
+    bbr_temperature_results):
     return shift_factor_error(
         T1,
         T2,
         x[0],
-        allresults)
+        bbr_temperature_results)
 
 def gpl_objective(
     params,
@@ -1604,7 +1662,7 @@ def ca_objective_opt(
 def fatigue_objective(
     T,
     target_value,
-    slope4,
+    arrhenius_slope,
     Tref,
     beta,
     logOmegaC,
@@ -1614,7 +1672,7 @@ def fatigue_objective(
     omega_red = (
         10
         * 10**(
-            slope4 *
+            arrhenius_slope *
             (
                 1/celsius_to_kelvin(T)
                 - 1/celsius_to_kelvin(Tref)
@@ -1628,7 +1686,7 @@ def fatigue_objective(
 
 def pavel_kriz_objective(
     T,
-    slope4,
+    arrhenius_slope,
     Tref,
     beta,
     logOmegaC,
@@ -1636,7 +1694,7 @@ def pavel_kriz_objective(
     target_modulus
                 ):
     T = T[0]
-    omega_red_T_pavel_kriz = 10*10**(slope4*(1/celsius_to_kelvin(T)-1/celsius_to_kelvin(Tref)))
+    omega_red_T_pavel_kriz = 10*10**(arrhenius_slope*(1/celsius_to_kelvin(T)-1/celsius_to_kelvin(Tref)))
     #phase_pavel_kriz = 90/(1+(omega_red_T_pavel_kriz/(10**result_CA.x[1]))**result_CA.x[0])
     G_pavel_kriz = 1000*glassy_modulus*(1+(10**logOmegaC/omega_red_T_pavel_kriz)**beta)**(-1/beta)
     return (target_modulus - G_pavel_kriz)**2
@@ -1658,7 +1716,7 @@ def count_lines(file):
         return None
 
 def prepare_animation_data(
-    allresults,
+    bbr_temperature_results,
     a_T_list
 ):
     return {
@@ -1667,14 +1725,14 @@ def prepare_animation_data(
         "moving_time":
             np.array(LOG_BBR_TIMES),
         "stiffness_cache":
-            build_stiffness_cache(allresults)
+            build_stiffness_cache(bbr_temperature_results)
     }
 
 
 # Streamlit app layout
 st.title("BBRtoDSR Rheological Analysis Tool (Beta)")
 
-st.logo("icon.png", size="large")
+#st.logo("icon.png", size="large")
 
 
 # Create a sidebar
@@ -1781,8 +1839,22 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 
-st.image("BBRtoDSRv1.jpeg")
+#st.image("BBRtoDSRv1.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
+
+
+#tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+#    "Data",
+#    "Validation",
+#    "Master Curves",
+#    "Rheology",
+#    "Performance",
+#    "Report"
+#])
+
+
+
+
 st.write("""Data from at least two distinct BBR test temperatures are required for analysis. 
          Currently, CSV files generated by Cannon® Instrument Company software are supported (BBRw versions 1.34 and 1.35 have been tested). 
          XLSM files generated by PaveTest® Universal Test Module v2.3.0.5 have also been tested successfully.""")
@@ -1793,6 +1865,10 @@ if 'uploaded_files' not in st.session_state:
     
 if 'uploader_key' not in st.session_state:
     st.session_state.uploader_key = 0
+
+
+
+
 
 # File uploader
 uploaded_files = st.file_uploader("Choose files (CSV or XLSM)", 
@@ -1811,7 +1887,7 @@ if st.button("Clear loaded results"):
     st.session_state.uploader_key += 1
     st.rerun()
 
-allresults = pd.DataFrame(columns=['Temperature (C)','A','B','C','S(60)','m-value(60)'])
+bbr_temperature_results = pd.DataFrame(columns=['Temperature (C)','A','B','C','S(60)','m-value(60)'])
 
 # Perform analysis if there are uploaded files
 if st.session_state.uploaded_files:
@@ -1821,12 +1897,12 @@ if st.session_state.uploaded_files:
 
             loaded = load_bbr_file(uploaded_file)
         
-            data = loaded["data"]
-            results = loaded["results"]
-            model = loaded["model"]
+            bbr_data = loaded.bbr_data
+            bbr_fit_points = loaded.bbr_fit_points
+            bbr_fit_model = loaded.bbr_fit_model
         
-            target_temperature = loaded["target_temperature"]
-            actual_temperature = loaded["actual_temperature"]
+            target_temperature = loaded.target_temperature
+            actual_temperature = loaded.actual_temperature
 
         except Exception as e:
 
@@ -1838,34 +1914,34 @@ if st.session_state.uploaded_files:
         
         
         st.write(f"**Data from {uploaded_file.name}:**")
-        st.dataframe(results, hide_index = True)
-        fig = create_plot(results)
+        st.dataframe(bbr_fit_points, hide_index = True)
+        fig = create_bbr_fit_plot(bbr_fit_points)
         st.pyplot(fig)
         
         analysis_temperature = target_temperature
         
         if abs(actual_temperature - target_temperature) > 0.1:
-            st.write("""Temperature control was outside the acceptable tolerance. The target and measured temperatures differed by more than 0.1°C. 
+            st.warning("""Temperature control was outside the acceptable tolerance. The target and measured temperatures differed by more than 0.1°C. 
                      The measured temperature will therefore be used as the analysis temperature.""")
             analysis_temperature = round(actual_temperature,2)
         
-        allresults.loc[len(allresults)] = [
+        bbr_temperature_results.loc[len(bbr_temperature_results)] = [
         analysis_temperature,
-        model.coefficients[2],
-        model.coefficients[1],
-        model.coefficients[0],
-        10**(model(np.log10(REFERENCE_BBR_TIME))),
+        bbr_fit_model.coefficients[2],
+        bbr_fit_model.coefficients[1],
+        bbr_fit_model.coefficients[0],
+        10**(bbr_fit_model(np.log10(REFERENCE_BBR_TIME))),
         abs(
-        2 * model.coefficients[0]
+        2 * bbr_fit_model.coefficients[0]
         * np.log10(REFERENCE_BBR_TIME)
-        + model.coefficients[1]
+        + bbr_fit_model.coefficients[1]
         )
         ]
-        st.write(
+        st.success(
     f"Added {uploaded_file.name} at {analysis_temperature:.2f} °C")
 
 
-temps = np.sort(allresults['Temperature (C)'].to_numpy())
+temps = np.sort(bbr_temperature_results['Temperature (C)'].to_numpy())
 
 if len(temps) >= 2:
 
@@ -1878,13 +1954,16 @@ if len(temps) >= 2:
 if st.button("Generate DSR Results"):
     st.markdown("""---""")
     st.subheader("Low Temperature Properties")
-    allresults.sort_values('Temperature (C)',
+    bbr_temperature_results.sort_values('Temperature (C)',
                                         axis=0,
                                         ascending=False,inplace=True)
-    allresults.reset_index(drop=True, inplace=True)
-    st.dataframe(allresults , hide_index = True)
+    bbr_temperature_results.reset_index(drop=True, inplace=True)
+    st.dataframe(bbr_temperature_results , hide_index = True)
     
-    if len(allresults)<2:
+    reference_temperature = (
+    bbr_temperature_results.loc[0, 'Temperature (C)'])
+    
+    if len(bbr_temperature_results)<2:
         
         st.warning("Upload at least two BBR datasets obtained at distinct test temperatures.")
         
@@ -1896,7 +1975,7 @@ if st.button("Generate DSR Results"):
 
     else:
         low_temp = calculate_low_temperature_properties(
-            allresults
+            bbr_temperature_results
         )
         
         T_s = low_temp["Tc_S"]
@@ -1911,23 +1990,24 @@ if st.button("Generate DSR Results"):
     
         st.subheader("**Time-Temperature Superposition (TTS) Using the Arrhenius Model**")
         
-        st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {allresults['Temperature (C)'][0]} °C**")           
+        st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {reference_temperature} °C**")           
        
-        tts = compute_tts(allresults)
+        tts = compute_tts(bbr_temperature_results)
         
-        a_T_list = tts["a_T_list"]
-        temperatures = tts["temperatures"]         
-        reduced_time_list = tts["reduced_time_list"]
-        stiffness_list = tts["stiffness_list"]
-        shift_data = tts["shift_data"]
-        master_curve_series = tts["master_curve_series"]
-        slope4 = tts["slope4"]
-        r_squared_Arrhenius = tts["r_squared_Arrhenius"]
-        shift_factor_values = tts["shift_factor_values"]
-        arrhenius_values = tts["arrhenius_values"]
+        
+        a_T_list = tts.a_T_list
+        temperatures = tts.temperatures
+        reduced_time_list = tts.reduced_time_list
+        stiffness_list = tts.stiffness_list
+        shift_data = tts.shift_data
+        master_curve_series = tts.master_curve_series
+        arrhenius_slope = tts.arrhenius_slope
+        r_squared_Arrhenius = tts.r_squared_Arrhenius
+        shift_factor_values = tts.shift_factor_values
+        arrhenius_values = tts.arrhenius_values
         
         activation_energy = (
-                                tts["slope4"]
+                                tts.arrhenius_slope
                                 * np.log(10)
                                 * GAS_CONSTANT
                                 / 1000
@@ -1957,7 +2037,7 @@ if st.button("Generate DSR Results"):
         
         st.markdown("""---""")
         
-        master_curve_fig = create_master_curve_plot(master_curve_series)
+        master_curve_fig = create_master_curve_plot(master_curve_series, reference_temperature)
         st.pyplot(master_curve_fig)
 
         st.markdown("""---""")
@@ -1995,7 +2075,8 @@ if st.button("Generate DSR Results"):
                 newtime,
                 newcreepcom,
                 round(r2_gpl, 4),
-                round(rmse_log, 4)
+                round(rmse_log, 4),
+                reference_temperature
             )
             
         st.pyplot(gpl_fig)
@@ -2026,7 +2107,7 @@ if st.button("Generate DSR Results"):
         glassy_modulus_CA = ca["glassy_modulus"]
         
         
-        logomega_C_zero = np.log10((10**logOmegaC)*(10**(slope4*(1/celsius_to_kelvin(0)-1/celsius_to_kelvin(allresults['Temperature (C)'][0])))))
+        logomega_C_zero = np.log10((10**logOmegaC)*(10**(arrhenius_slope*(1/celsius_to_kelvin(0)-1/celsius_to_kelvin(reference_temperature)))))
         
         if not ca["success"] and r2_CA < 0.99:
             st.warning(f"CA optimizer message: {ca['message']}")
@@ -2048,7 +2129,8 @@ if st.button("Generate DSR Results"):
             newomega,
             newG_CA,
             r2_CA,
-            rmse_CA
+            rmse_CA,
+            reference_temperature
         )
         
         st.pyplot(ca_fig)
@@ -2069,24 +2151,24 @@ if st.button("Generate DSR Results"):
 
     
         gr = compute_gr(
-            slope4,
-            allresults['Temperature (C)'][0],
+            arrhenius_slope,
+            reference_temperature,
             beta,
             logOmegaC,
             glassy_modulus_CA
         )
         
-        phase_GR = gr["phase_GR"]
-        G_GR = gr["G_GR"]
-        G_R = gr["G_R"]
+        phase_gr = gr["phase_gr"]
+        g_gr = gr["g_gr"]
+        g_r = gr["g_r"]
 
-        st.write(f"**$G-R$: {round(G_R,0)} kPa**")
-        st.write(f"**$|G^{'*'}|_{{{'G-R'}}}$: {round(G_GR,0)} kPa**")
-        st.write(f"**$δ_{{{'G-R'}}}$: {round(phase_GR,0)} °**")
+        st.write(f"**$G-R$: {round(g_r,0)} kPa**")
+        st.write(f"**$|G^{'*'}|_{{{'G-R'}}}$: {round(g_gr,0)} kPa**")
+        st.write(f"**$δ_{{{'G-R'}}}$: {round(phase_gr,0)} °**")
         
-        gr_fig = create_gr_plot(
-            phase_GR,
-            G_GR,
+        gr_fig = create_glover_rowe_plot(
+            phase_gr,
+            g_gr,
             show_RI_contours
         )
         
@@ -2098,8 +2180,8 @@ if st.button("Generate DSR Results"):
         st.markdown("""---""")
         
         fatigue = compute_fatigue(
-        slope4,
-        allresults['Temperature (C)'][0],
+        arrhenius_slope,
+        reference_temperature,
         beta,
         logOmegaC,
         glassy_modulus_CA
@@ -2146,8 +2228,8 @@ if st.button("Generate DSR Results"):
         st.subheader("**Pavel-Kriz Phase Angle, [Detection of Phase Incompatible Binders](https://trid.trb.org/View/2344464/)**")
 
         pavel_kriz = compute_pavel_kriz(
-            slope4,
-            allresults['Temperature (C)'][0],
+            arrhenius_slope,
+            reference_temperature,
             beta,
             logOmegaC,
             glassy_modulus_CA,
@@ -2183,7 +2265,7 @@ if st.button("Generate DSR Results"):
 
             
             animation_data = prepare_animation_data(
-                                                        allresults,
+                                                        bbr_temperature_results,
                                                         a_T_list
                                                     )
                                                     
@@ -2199,7 +2281,8 @@ if st.button("Generate DSR Results"):
                                                                                         movingtime,
                                                                                         movingshifts,
                                                                                         ymin,
-                                                                                        ymax
+                                                                                        ymax,
+                                                                                        reference_temperature
                                                                                         )
             
             ani = create_master_curve_animation(
