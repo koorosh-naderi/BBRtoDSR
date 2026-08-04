@@ -1732,7 +1732,7 @@ def prepare_animation_data(
 # Streamlit app layout
 st.title("BBRtoDSR Rheological Analysis Tool (Beta)")
 
-#st.logo("icon.png", size="large")
+st.logo("icon.png", size="large")
 
 
 # Create a sidebar
@@ -1839,7 +1839,7 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 
-#st.image("BBRtoDSRv1.jpeg")
+st.image("BBRtoDSRv1.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
 
 
