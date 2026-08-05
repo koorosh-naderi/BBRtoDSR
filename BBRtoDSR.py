@@ -56,6 +56,12 @@ RI_LINES = np.arange(1,4.5,0.5)
 
 REPLICATE_TEMPERATURE_TOLERANCE = 0.1
 
+
+plt.rcParams.update({
+    'figure.facecolor': '#F8F8F8',
+    'axes.facecolor': '#F8F8F8'
+})
+
 #-----------------------------------------------------------------
 
 @dataclass
@@ -85,8 +91,7 @@ def create_load_result(
 def load_csv(uploaded_file):
     uploaded_file.seek(0)
     num_lines = count_lines(uploaded_file)
-    if num_lines is None:
-        raise ValueError("Could not determine line count.")
+    
 
     if num_lines>44:
         
@@ -102,10 +107,32 @@ def load_csv(uploaded_file):
         beam_span = np.float64(info[2][6])/1000
         beam_width = np.float64(info[2][7])/1000
         beam_thickness = np.float64(info[2][8])/1000
-        bbr_data['Stiffness (MPa)'] = 1/1000000*(np.float64(bbr_data['Force (mN)'])*beam_span**3)/(np.float64(bbr_data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
+        
+        force = np.float64(bbr_data['Force (mN)'])
+        deflection = np.float64(bbr_data['Deflection (mm)'])
+        
+        bbr_data['Stiffness (MPa)'] = np.nan
+
+        mask = deflection > 0
+        
+        bbr_data.loc[mask, 'Stiffness (MPa)'] = (
+            1e-6
+            * force[mask]
+            * beam_span**3
+            / (
+                deflection[mask]
+                * 4
+                * beam_width
+                * beam_thickness**3
+            )
+        )
+        
+        
+        #bbr_data['Stiffness (MPa)'] = 1/1000000*(np.float64(bbr_data['Force (mN)'])*beam_span**3)/(np.float64(bbr_data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
+        
         target_temperature = np.float64(info[2][4])
         
-        bbr_data, bbr_fit_points, bbr_fit_model = fit_bbr_curve(bbr_data)
+        bbr_data, bbr_fit_points, bbr_fit_model  = fit_bbr_curve(bbr_data)
         
         
         actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
@@ -162,7 +189,27 @@ def load_xlsm(uploaded_file):
     beam_thickness = np.float64(full_sheet.iloc[20,8])/1000
     target_temperature = np.float64(full_sheet.iloc[28,2])
     
-    bbr_data['Stiffness (MPa)'] = 1/1000000*(np.float64(bbr_data['Force (mN)'])*beam_span**3)/(np.float64(bbr_data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
+    
+    force = np.float64(bbr_data['Force (mN)'])
+    deflection = np.float64(bbr_data['Deflection (mm)'])
+    
+    bbr_data['Stiffness (MPa)'] = np.nan
+
+    mask = deflection > 0
+    
+    bbr_data.loc[mask, 'Stiffness (MPa)'] = (
+        1e-6
+        * force[mask]
+        * beam_span**3
+        / (
+            deflection[mask]
+            * 4
+            * beam_width
+            * beam_thickness**3
+        )
+    )
+    
+    #bbr_data['Stiffness (MPa)'] = 1/1000000*(np.float64(bbr_data['Force (mN)'])*beam_span**3)/(np.float64(bbr_data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
     
     bbr_data, bbr_fit_points, bbr_fit_model = fit_bbr_curve(bbr_data)
     
@@ -271,13 +318,71 @@ def celsius_to_kelvin(temp_c):
 def fit_bbr_curve(bbr_data):
     bbr_data = bbr_data.copy()
     bbr_data['Time (s)'] = pd.to_numeric(bbr_data['Time (s)'], errors='coerce')
-    bbr_data['log(t)'] = np.log10(
-        np.float64(bbr_data['Time (s)']))
-    bbr_data['log(S)'] = np.log10(
-        bbr_data['Stiffness (MPa)'])
+    
+    
+    time_values = np.float64(bbr_data['Time (s)'])
+    stiffness_values = np.float64(
+        bbr_data['Stiffness (MPa)']
+    )
+    
+    bbr_data['log(t)'] = np.nan
+
+    time_mask = time_values > 0
+    
+    bbr_data.loc[time_mask, 'log(t)'] = np.log10(
+        time_values[time_mask]
+    )
+    
+    bbr_data['log(S)'] = np.nan
+
+    stiffness_mask = stiffness_values > 0
+    
+    bbr_data.loc[stiffness_mask, 'log(S)'] = np.log10(
+        stiffness_values[stiffness_mask]
+    )
+    
+    
+    
+    #bbr_data['log(t)'] = np.log10(
+    #    np.float64(bbr_data['Time (s)']))
+    #bbr_data['log(S)'] = np.log10(
+    #    bbr_data['Stiffness (MPa)'])
+    
     bbr_fit_points = bbr_data[
     bbr_data['Time (s)'].isin(
             BBR_TIMES)]
+    
+    bbr_fit_points = (
+        bbr_fit_points
+        .replace(
+            [np.inf, -np.inf],
+            np.nan
+        )
+        .dropna(
+            subset=[
+                'log(t)',
+                'log(S)'
+            ]
+        )
+    )
+    
+    #expected_points = len(BBR_TIMES)
+    actual_points = len(bbr_fit_points)
+
+    if actual_points < 3:
+        raise ValueError(
+            f"Only {actual_points} valid BBR points were found. "
+            "At least 3 points are required for a quadratic fit."
+        )
+        
+    #fit_warning = None
+
+    #if actual_points < expected_points:
+    #    fit_warning = (
+    #        f"Only {actual_points} of {expected_points} expected "
+    #        "BBR time points were available."
+    #    )
+    
     bbr_fit_model = np.poly1d(
         np.polyfit(
             bbr_fit_points['log(t)'],
@@ -308,12 +413,14 @@ class TTSResult:
     r_squared_Arrhenius: float
     shift_factor_values: np.ndarray
     arrhenius_values: np.ndarray
+    warnings: list
 
 def compute_tts(bbr_temperature_results):
 
     a_T_list = []
     master_curve_series = []
     shift_data = []
+    warnings = []
     
     reference_temperature = (
     bbr_temperature_results.loc[0, 'Temperature (C)']
@@ -353,6 +460,13 @@ def compute_tts(bbr_temperature_results):
         result = minimize(shift_factor_objective,
                           initial_x,
                           args=(fixed_T1, fixed_T2, bbr_temperature_results), bounds=[(-10, 10)])
+        
+        if not result.success:
+
+            warnings.append(
+                f"Shift factor optimization failed between "
+                f"{fixed_T1:.1f}°C and {fixed_T2:.1f}°C"
+            )
         
         
         a_T_list.append(result.x[0])
@@ -407,7 +521,8 @@ def compute_tts(bbr_temperature_results):
     arrhenius_slope=arrhenius_slope,
     r_squared_Arrhenius=r_squared_Arrhenius,
     shift_factor_values=shift_factor_values,
-    arrhenius_values=arrhenius_values
+    arrhenius_values=arrhenius_values,
+    warnings=warnings
                     )
 
    
@@ -555,7 +670,8 @@ def compute_ca(
                 reduced_omega,
                 dynamic_shear_modulus,
                 glassy_modulus
-            )
+            ),
+            bounds=[(0.01, 5), (-10, 10)]
         )
     
     if optimize_glassy_modulus:
@@ -934,14 +1050,19 @@ def add_reference_temperature_label(
 
 def create_bbr_fit_plot(bbr_fit_points):
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
-    ax.plot(bbr_fit_points['Time (s)'], bbr_fit_points['Sc (MPa)'],label='Estimated', linestyle='-')
-    ax.plot(bbr_fit_points['Time (s)'], bbr_fit_points['Stiffness (MPa)'],label='Measured', linestyle=':', marker='o')
+    
+    
+    ax.plot(bbr_fit_points['Time (s)'], bbr_fit_points['Sc (MPa)'],label='Estimated', linestyle='-', c='#634B71')
+    ax.plot(bbr_fit_points['Time (s)'], bbr_fit_points['Stiffness (MPa)'],label='Measured', linestyle=':', marker='o', c='#EE7402', alpha=0.5)
     ax.set_title('Plot of Stiffness vs Time')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Stiffness (MPa)')
+    
+    
     ax.set_xscale('log')
     ax.set_yscale('log')
     handles, labels = ax.get_legend_handles_labels()
+    
     ax.legend(handles, labels)
     return fig
 
@@ -953,13 +1074,15 @@ def create_arrhenius_plot(
 ):
 
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
+    
+
 
     ax.plot(
         np.array(temperature_list),
         shift_factor_values,
         label='Shift Factors',
         linestyle='None',
-        marker='o'
+        marker='o', c='#634B71'
     )
 
     ax.plot(
@@ -967,7 +1090,8 @@ def create_arrhenius_plot(
         arrhenius_values,
         label='Arrhenius Model',
         linestyle='-',
-        marker='None'
+        marker='None',
+        c='#EE7402'
     )
 
     ax.set_title('Shift Factor vs Temperature')
@@ -991,6 +1115,97 @@ def create_arrhenius_plot(
     ax.legend(handles, labels)
 
     return fig
+
+
+def create_low_temperature_properties_plot(
+    bbr_temperature_results,
+    low_temp
+):
+
+    fig, (ax1, ax2) = plt.subplots(
+        1, 2,
+        figsize=(10,5),
+        dpi=DISPLAY_DPI
+    )
+
+    # ------------------------
+    # Stiffness criterion
+    # ------------------------
+
+    ax1.plot(
+        bbr_temperature_results['Temperature (C)'],
+        bbr_temperature_results['S(60)'],
+        label='Measured',ls='-',marker='o',c='#C0CE2E'
+    )
+
+
+    ax1.axhline(
+        STIFFNESS_LIMIT,
+        ls='--',
+        c='k'
+    )
+
+    ax1.axvline(
+        low_temp["Tc_S"]+10,
+        ls=':',
+        c='#EE7402',
+        label='S(60)=300 MPa'
+    )
+
+    ax1.plot(
+        low_temp["Tc_S"]+10,
+        STIFFNESS_LIMIT,marker='o',
+        c='#EE7402'
+    )
+
+    ax1.set_yscale('log')
+    ax1.set_xlabel('Test Temperature (°C)')
+    ax1.set_ylabel('S(60) (MPa)')
+    ax1.set_title(f'$T_{{{"c,S"}}}$ = {low_temp["Tc_S"]:.1f} °C')
+
+    # ------------------------
+    # m-value criterion
+    # ------------------------
+
+    ax2.plot(
+        bbr_temperature_results['Temperature (C)'],
+        bbr_temperature_results['m-value(60)'],
+        label='Measured',ls='-',marker='o',c='#A3186D'
+    )
+
+
+    ax2.axhline(
+        M_VALUE_LIMIT,
+        ls='--',
+        c='k'
+    )
+
+    ax2.axvline(
+        low_temp["Tc_m"]+10,
+        ls=':',
+        c='#634B71',
+        label='m-value(60)=0.300'
+    )
+
+    ax2.plot(
+        low_temp["Tc_m"]+10,
+        M_VALUE_LIMIT,marker='o',
+        c='#634B71'
+    )
+
+    ax2.set_xlabel('Test Temperature (°C)')
+    ax2.set_ylabel('m-value(60)')
+    ax2.set_title(f'$T_{{{"c,m"}}}$ = {low_temp["Tc_m"]:.1f} °C')
+
+    fig.suptitle(
+        f'$ΔT_c$ = {low_temp["Delta_Tc"]:.1f} °C'
+    )
+
+    ax1.legend()
+    ax2.legend()
+
+    return fig
+
 
 def create_master_curve_plot(master_curve_series,
                              reference_temperature):
@@ -1040,7 +1255,7 @@ def create_gpl_plot(
         creep_comp_list,
         label='Master Curve',
         linestyle='None',
-        marker='o'
+        marker='o', c='#634B71'
     )
 
     ax.plot(
@@ -1048,7 +1263,8 @@ def create_gpl_plot(
         newcreepcom,
         label='GPL Model',
         linestyle='-',
-        marker='None'
+        marker='None',
+        c='#EE7402'
     )
     
     ax.set_title('Creep Compliance Master Curve')
@@ -1099,7 +1315,7 @@ def create_ca_plot(
         dynamic_shear_modulus,
         label='Master Curve',
         linestyle='None',
-        marker='o'
+        marker='o', c='#634B71'
     )
 
     ax.plot(
@@ -1107,7 +1323,8 @@ def create_ca_plot(
         newG_CA,
         label='CA Model',
         linestyle='-',
-        marker='None'
+        marker='None',
+        c='#EE7402'
     )
 
     
@@ -1240,7 +1457,7 @@ def create_glover_rowe_plot(
         label='G-R Parameter',
         linestyle='None',
         marker='o',
-        zorder=100
+        zorder=100, c='#634B71'
     )
 
     ax.plot(
@@ -1249,7 +1466,7 @@ def create_glover_rowe_plot(
         /np.cos(np.radians(np.arange(1,89,1)))**2,
         label='G-R = 180 kPa',
         linestyle='-',
-        c='green',
+        c='#C0CE2E',
         zorder=2
     )
 
@@ -1259,7 +1476,7 @@ def create_glover_rowe_plot(
         /np.cos(np.radians(np.arange(1,89,1)))**2,
         label='G-R = 600 kPa',
         linestyle='-',
-        c='red',
+        c='#A3186D',
         zorder=2
     )
 
@@ -1293,7 +1510,7 @@ def create_fatigue_plot(
         marker='o',
         alpha=0.7,
         markersize=2,
-        c='red'
+        c='#EE7402'
     )
 
     ax.plot(
@@ -1365,7 +1582,8 @@ def create_pavel_kriz_plot(
         label='CA Model Points',
         linestyle='--',
         marker='',
-        alpha=0.6
+        alpha=0.6,
+        c='#634B71'
     )
 
     ax.plot(
@@ -1375,7 +1593,7 @@ def create_pavel_kriz_plot(
         linestyle='None',
         marker='o',
         alpha=0.6,
-        zorder=100
+        zorder=100, c='#EE7402'
     )
 
     ax.vlines(
@@ -1430,7 +1648,7 @@ def create_master_curve_animation_figure(
         ax.plot(
             [],
             [],
-            label=f'T = {round(temp,2)} °C',
+            label=f'T = {round(temp,1)} °C',
             antialiased=True,
             alpha=0.4,
             linewidth=5
@@ -1702,19 +1920,20 @@ def pavel_kriz_objective(
 
 def count_lines(file):
     try:
-        # Attempt to read the file content
         content = file.getvalue()
+
         try:
             decoded_content = content.decode("utf-8")
+
         except UnicodeDecodeError:
-            # Fallback to a different encoding if UTF-8 fails
-            decoded_content = content.decode("ISO-8859-1")  # or "latin1" or "cp1252"
-        
-        lines = decoded_content.splitlines()
-        return len(lines)
+            decoded_content = content.decode("ISO-8859-1")
+
+        return len(decoded_content.splitlines())
+
     except Exception as e:
-        st.error(f"An error occurred: {e}")
-        return None
+        raise ValueError(
+            f"Unable to count lines: {e}"
+        )
 
 def prepare_animation_data(
     bbr_temperature_results,
@@ -2185,7 +2404,7 @@ if st.session_state.analysis_complete:
         st.stop()
     
     st.success(
-    "Results are now being generated. Navigate through the tabs to review them."
+    "Analysis successfully started. Navigate through the tabs to review them."
     )
     
     
@@ -2224,9 +2443,38 @@ if st.session_state.analysis_complete:
             T_m = low_temp["Tc_m"]
             Delta_Tc = low_temp["Delta_Tc"]
             
-            st.write(f"**$T_{{{'c,S'}}}$: {T_s} °C**")
-            st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
-            st.write(f"**$Δ T_{'c'}$: {Delta_Tc} °C**")
+            low_temp_fig = create_low_temperature_properties_plot(
+                bbr_temperature_results,
+                low_temp
+            )
+            
+            st.pyplot(low_temp_fig)
+            
+                        
+            col_tcs, col_tcm, col_deltatc = st.columns(3)
+            
+            with col_tcs:
+                st.metric(f"$T_{{{'c,S'}}}$", f"{T_s:.1f} °C",border=True)
+            with col_tcm:
+                st.metric(f"$T_{{{'c,m'}}}$", f"{T_m:.1f} °C",border=True)
+            with col_deltatc:
+                st.metric(f"$Δ T_{'c'}$", f"{Delta_Tc} °C",border=True)
+            
+            if Delta_Tc > -2.5:
+                col_deltatc.success("✅️ Low embrittlement risk")
+            
+            elif Delta_Tc > -5:
+                col_deltatc.warning("⚠️ Intermediate concern")
+            
+            else:
+                col_deltatc.error("❌ High embrittlement risk")
+        
+        st.markdown("""---""")        
+        
+        st.write(f"Please note that $T_{{{'c,S'}}}$ and $T_{{{'c,m'}}}$ are critical temperatures that have been shifted by −10 °C from the test temperature. "
+                 "This adjustment converts the 60 s test condition to an equivalent 7,200 s stiffness, which was the original criterion for resistance to single-event low-temperature cracking. "
+                 f"Also note that $ΔT_{'c'}$ was introduced to help detect highly aged or waxy bitumen samples. "
+                 f"However, $ΔT_{'c'}$ can be low for polymer-modified binders; a low $ΔT_{'c'}$ does not necessarily indicate a high susceptibility to cracking.")
 
         
         
@@ -2237,6 +2485,9 @@ if st.session_state.analysis_complete:
         st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {reference_temperature} °C**")           
        
         tts = compute_tts(bbr_temperature_results)
+        
+        for msg in tts.warnings:
+            st.warning(msg)
         
         
         a_T_list = tts.a_T_list
