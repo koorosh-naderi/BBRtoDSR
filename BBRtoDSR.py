@@ -4,7 +4,6 @@ Created on Tue Apr 29 16:42:12 2025
 
 @author: NADERIK1
 """
-
 #import libraries
 import streamlit as st
 import numpy as np
@@ -2006,6 +2005,13 @@ st.image("BBRtoDSRv1.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
 
 
+
+
+
+
+
+
+
 tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation = st.tabs([
     "Data",
     "Low Temperature Properties",
@@ -2178,8 +2184,10 @@ if st.session_state.analysis_complete:
         
         st.stop()
     
-
-
+    st.success(
+    "Results are now being generated. Navigate through the tabs to review them."
+    )
+    
     
     with tab_lowtemp:
     
