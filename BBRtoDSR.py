@@ -2471,10 +2471,10 @@ if st.session_state.analysis_complete:
         
         st.markdown("""---""")        
         
-        st.write(f"Please note that $T_{{{'c,S'}}}$ and $T_{{{'c,m'}}}$ are critical temperatures that have been shifted by −10 °C from the test temperature. "
+        st.write(f"**Please note that $T_{{{'c,S'}}}$ and $T_{{{'c,m'}}}$ are critical temperatures that have been shifted by −10 °C from the test temperature. "
                  "This adjustment converts the 60 s test condition to an equivalent 7,200 s stiffness, which was the original criterion for resistance to single-event low-temperature cracking. "
                  f"Also note that $ΔT_{'c'}$ was introduced to help detect highly aged or waxy bitumen samples. "
-                 f"However, $ΔT_{'c'}$ can be low for polymer-modified binders; a low $ΔT_{'c'}$ does not necessarily indicate a high susceptibility to cracking.")
+                 f"However, $ΔT_{'c'}$ can be low for polymer-modified binders; a low $ΔT_{'c'}$ does not necessarily indicate a high susceptibility to cracking.**")
 
         
         
