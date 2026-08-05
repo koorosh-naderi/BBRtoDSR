@@ -55,6 +55,8 @@ DISPLAY_DPI = 450
 
 RI_LINES = np.arange(1,4.5,0.5)
 
+REPLICATE_TEMPERATURE_TOLERANCE = 0.1
+
 #-----------------------------------------------------------------
 
 @dataclass
@@ -1001,7 +1003,7 @@ def create_master_curve_plot(master_curve_series,
         ax.plot(
             curve["time"],
             curve["stiffness"],
-            label=f'{curve["temperature"]} °C',
+            label=f'{round(curve["temperature"], 1)} °C',
             linestyle='-',
             linewidth=5.0,
             alpha=0.4,
@@ -1729,6 +1731,167 @@ def prepare_animation_data(
     }
 
 
+def merge_replicate_temperatures(
+    bbr_temperature_results,
+    bbr_curve_results,
+    tolerance=REPLICATE_TEMPERATURE_TOLERANCE
+):
+    
+    messages = []
+    sorted_curves = sorted(
+        bbr_curve_results,
+        key=lambda x: x["temperature"]
+    )
+
+    groups = []
+
+    for curve in sorted_curves:
+
+        temp = curve["temperature"]
+
+        placed = False
+
+        for group in groups:
+
+            group_mean = np.mean(
+                [x["temperature"] for x in group]
+            )
+
+            if abs(temp - group_mean) <= tolerance:
+
+                group.append(curve)
+                placed = True
+                break
+
+        if not placed:
+
+            groups.append([curve])
+
+    merged_rows = []
+
+    for group in groups:
+
+        temperatures = [
+            x["temperature"]
+            for x in group
+        ]
+
+        representative_temperature = np.mean(
+            temperatures
+        )
+
+        # -------------------------
+        # Single test: keep original
+        # -------------------------
+
+        if len(group) == 1:
+
+            temp = temperatures[0]
+
+            original_row = (
+                bbr_temperature_results[
+                    np.isclose(
+                        bbr_temperature_results[
+                            'Temperature (C)'
+                        ],
+                        temp,
+                        atol=1e-6
+                    )
+                ]
+                .iloc[0]
+                .to_dict()
+            )
+
+            merged_rows.append(
+                original_row
+            )
+
+            continue
+
+        # -------------------------
+        # Replicates: average S(t)
+        # -------------------------
+
+
+        combined = []
+
+        for item in group:
+        
+            df = item["fit_points"][
+                ["Time (s)", "Stiffness (MPa)"]
+            ].copy()
+        
+            combined.append(df)
+        
+        all_points = pd.concat(combined)
+        
+        messages.append(
+            f"{len(group)} replicate tests near "
+            f"{representative_temperature:.2f} °C "
+            f"were averaged before analysis."
+        )
+
+        mean_curve = (
+                        all_points
+                        .groupby("Time (s)")
+                        ["Stiffness (MPa)"]
+                        .mean()
+                        .reset_index()
+                        )
+        
+        if len(mean_curve) < 3:
+            raise ValueError(
+                f"Insufficient data points after averaging "
+                f"replicates near "
+                f"{representative_temperature:.2f} °C."
+            )
+        
+        poly = np.poly1d(
+            np.polyfit(
+                np.log10(mean_curve["Time (s)"]),
+                np.log10(mean_curve["Stiffness (MPa)"]),
+                2
+            )
+        )
+
+        
+
+        s60 = 10**(
+            poly(
+                np.log10(
+                    REFERENCE_BBR_TIME
+                )
+            )
+        )
+
+        m60 = abs(
+            2
+            * poly.coefficients[0]
+            * np.log10(
+                REFERENCE_BBR_TIME
+            )
+            +
+            poly.coefficients[1]
+        )
+
+        merged_rows.append(
+            {
+                'Temperature (C)': representative_temperature,
+                'A': poly.coefficients[2],
+                'B': poly.coefficients[1],
+                'C': poly.coefficients[0],
+                'S(60)': s60,
+                'm-value(60)': m60
+            }
+        )
+
+    return pd.DataFrame(
+        merged_rows
+    ), messages
+
+
+
+
 # Streamlit app layout
 st.title("BBRtoDSR Rheological Analysis Tool (Beta)")
 
@@ -1843,151 +2006,224 @@ st.image("BBRtoDSRv1.jpeg")
 st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
 
 
-#tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-#    "Data",
-#    "Validation",
-#    "Master Curves",
-#    "Rheology",
-#    "Performance",
-#    "Report"
-#])
+tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation = st.tabs([
+    "Data",
+    "Low Temperature Properties",
+    "TTS",
+    "DSR Transformation",
+    "Intermediate Temperature Performance",
+    "Animation"
+])
 
 
+with tab_data:
 
-
-st.write("""Data from at least two distinct BBR test temperatures are required for analysis. 
-         Currently, CSV files generated by Cannon® Instrument Company software are supported (BBRw versions 1.34 and 1.35 have been tested). 
-         XLSM files generated by PaveTest® Universal Test Module v2.3.0.5 have also been tested successfully.""")
-
-# Session state to track uploaded files
-if 'uploaded_files' not in st.session_state:
-    st.session_state.uploaded_files = []
+    st.write("""Data from at least two distinct BBR test temperatures are required for analysis. 
+             Currently, CSV files generated by Cannon® Instrument Company software are supported (BBRw versions 1.34 and 1.35 have been tested). 
+             XLSM files generated by PaveTest® Universal Test Module v2.3.0.5 have also been tested successfully.""")
     
-if 'uploader_key' not in st.session_state:
-    st.session_state.uploader_key = 0
-
-
-
-
-
-# File uploader
-uploaded_files = st.file_uploader("Choose files (CSV or XLSM)", 
-                                  accept_multiple_files=True, 
-                                  type=['csv', 'xlsm'],
-                                  key=f"uploader_{st.session_state.uploader_key}"
-                                  )
-
-# If new files are uploaded, clear previous analysis
-if uploaded_files:
-    st.session_state.uploaded_files = uploaded_files
-
-# Button to clear analysis
-if st.button("Clear loaded results"):
-    st.session_state.uploaded_files = []
-    st.session_state.uploader_key += 1
-    st.rerun()
-
-bbr_temperature_results = pd.DataFrame(columns=['Temperature (C)','A','B','C','S(60)','m-value(60)'])
-
-# Perform analysis if there are uploaded files
-if st.session_state.uploaded_files:
+    # Session state to track uploaded files
+    if 'uploaded_files' not in st.session_state:
+        st.session_state.uploaded_files = []
+        
+    if 'uploader_key' not in st.session_state:
+        st.session_state.uploader_key = 0
+        
+    if "analysis_complete" not in st.session_state:
+        st.session_state.analysis_complete = False
     
-    for uploaded_file in uploaded_files:
-        try:
-
-            loaded = load_bbr_file(uploaded_file)
+    
+    
+    
+    
+    # File uploader
+    uploaded_files = st.file_uploader("Choose files (CSV or XLSM)", 
+                                      accept_multiple_files=True, 
+                                      type=['csv', 'xlsm'],
+                                      key=f"uploader_{st.session_state.uploader_key}"
+                                      )
+    
+    # If new files are uploaded, clear previous analysis
+    if uploaded_files != st.session_state.uploaded_files:
+        st.session_state.uploaded_files = uploaded_files
+        st.session_state.analysis_complete = False
+    
+    # Button to clear analysis
+    if st.button("Clear loaded results"):
+        st.session_state.uploaded_files = []
+        st.session_state.uploader_key += 1
+        st.session_state.analysis_complete = False
+        st.rerun()
+    
+    bbr_temperature_results = pd.DataFrame(columns=['Temperature (C)','A','B','C','S(60)','m-value(60)'])
+    
+    bbr_curve_results = []
+    
+    # Perform analysis if there are uploaded files
+    if st.session_state.uploaded_files:
         
-            bbr_data = loaded.bbr_data
-            bbr_fit_points = loaded.bbr_fit_points
-            bbr_fit_model = loaded.bbr_fit_model
-        
-            target_temperature = loaded.target_temperature
-            actual_temperature = loaded.actual_temperature
-
-        except Exception as e:
-
-            st.error(
-                f"Error reading {uploaded_file.name}: {e}"
+        for uploaded_file in uploaded_files:
+            try:
+    
+                loaded = load_bbr_file(uploaded_file)
+            
+                bbr_data = loaded.bbr_data
+                bbr_fit_points = loaded.bbr_fit_points
+                bbr_fit_model = loaded.bbr_fit_model
+            
+                target_temperature = loaded.target_temperature
+                actual_temperature = loaded.actual_temperature
+    
+            except Exception as e:
+    
+                st.error(
+                    f"Error reading {uploaded_file.name}: {e}"
+                )
+    
+                continue
+            
+            
+            st.write(f"**Data from {uploaded_file.name}:**")
+            st.dataframe(bbr_fit_points, hide_index = True)
+            fig = create_bbr_fit_plot(bbr_fit_points)
+            st.pyplot(fig)
+            
+            analysis_temperature = target_temperature
+            
+            if abs(actual_temperature - target_temperature) > 0.1:
+                st.warning("""Temperature control was outside the acceptable tolerance. The target and measured temperatures differed by more than 0.1°C. 
+                         The measured temperature will therefore be used as the analysis temperature.""")
+                analysis_temperature = round(actual_temperature,2)
+            
+            bbr_temperature_results.loc[len(bbr_temperature_results)] = [
+            analysis_temperature,
+            bbr_fit_model.coefficients[2],
+            bbr_fit_model.coefficients[1],
+            bbr_fit_model.coefficients[0],
+            10**(bbr_fit_model(np.log10(REFERENCE_BBR_TIME))),
+            abs(
+            2 * bbr_fit_model.coefficients[0]
+            * np.log10(REFERENCE_BBR_TIME)
+            + bbr_fit_model.coefficients[1]
             )
-
-            continue
-        
-        
-        st.write(f"**Data from {uploaded_file.name}:**")
-        st.dataframe(bbr_fit_points, hide_index = True)
-        fig = create_bbr_fit_plot(bbr_fit_points)
-        st.pyplot(fig)
-        
-        analysis_temperature = target_temperature
-        
-        if abs(actual_temperature - target_temperature) > 0.1:
-            st.warning("""Temperature control was outside the acceptable tolerance. The target and measured temperatures differed by more than 0.1°C. 
-                     The measured temperature will therefore be used as the analysis temperature.""")
-            analysis_temperature = round(actual_temperature,2)
-        
-        bbr_temperature_results.loc[len(bbr_temperature_results)] = [
-        analysis_temperature,
-        bbr_fit_model.coefficients[2],
-        bbr_fit_model.coefficients[1],
-        bbr_fit_model.coefficients[0],
-        10**(bbr_fit_model(np.log10(REFERENCE_BBR_TIME))),
-        abs(
-        2 * bbr_fit_model.coefficients[0]
-        * np.log10(REFERENCE_BBR_TIME)
-        + bbr_fit_model.coefficients[1]
-        )
-        ]
-        st.success(
-    f"Added {uploaded_file.name} at {analysis_temperature:.2f} °C")
-
-
-temps = np.sort(bbr_temperature_results['Temperature (C)'].to_numpy())
-
-if len(temps) >= 2:
-
-    if np.ptp(temps) < 1:
-        st.warning(
-            "The uploaded files appear to be from nearly identical temperatures."
-        )
+            ]
+            st.success(
+        f"Added {uploaded_file.name} at {analysis_temperature:.2f} °C")
+            #st.markdown("""---""")
+            
+            bbr_curve_results.append(
+                                        {
+                                            "temperature": analysis_temperature,
+                                            "fit_points": bbr_fit_points.copy()
+                                        }
+                                    )
+    
+    
+            
+    st.session_state.bbr_temperature_results = (
+    bbr_temperature_results.copy()
+    )
+    
+    st.session_state.bbr_curve_results = (
+        bbr_curve_results.copy()
+    )
+    
+    
   
         
 if st.button("Generate DSR Results"):
-    st.markdown("""---""")
-    st.subheader("Low Temperature Properties")
-    bbr_temperature_results.sort_values('Temperature (C)',
-                                        axis=0,
-                                        ascending=False,inplace=True)
-    bbr_temperature_results.reset_index(drop=True, inplace=True)
-    st.dataframe(bbr_temperature_results , hide_index = True)
     
-    reference_temperature = (
-    bbr_temperature_results.loc[0, 'Temperature (C)'])
+    st.session_state.analysis_complete = True
+  
+if st.session_state.analysis_complete:
     
-    if len(bbr_temperature_results)<2:
+    try:
         
-        st.warning("Upload at least two BBR datasets obtained at distinct test temperatures.")
-        
-    elif np.ptp(temps) < 1:
-    
-        st.error(
-        "The uploaded datasets appear to be from nearly identical temperatures. "
-        "Analysis requires data from at least two distinct test temperatures.")
-
-    else:
-        low_temp = calculate_low_temperature_properties(
-            bbr_temperature_results
+        bbr_temperature_results, replicate_messages = (
+            merge_replicate_temperatures(
+                st.session_state.bbr_temperature_results,
+                st.session_state.bbr_curve_results,
+                tolerance=REPLICATE_TEMPERATURE_TOLERANCE
+            )
         )
         
-        T_s = low_temp["Tc_S"]
-        T_m = low_temp["Tc_m"]
-        Delta_Tc = low_temp["Delta_Tc"]
+    except Exception as e:
         
-        st.write(f"**$T_{{{'c,S'}}}$: {T_s} °C**")
-        st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
-        st.write(f"**$Δ T_{'c'}$: {Delta_Tc} °C**")
-
-        st.markdown("""---""")
+        st.error(str(e))
+        st.stop()
     
+    bbr_temperature_results = (
+        bbr_temperature_results
+        .sort_values("Temperature (C)", ascending=False)
+        .reset_index(drop=True)
+    )
+    
+    for msg in replicate_messages:
+        st.info(msg)
+    
+    if len(bbr_temperature_results) < 2:
+        
+        remaining_temps = (
+            bbr_temperature_results["Temperature (C)"]
+            .round(2)
+            .tolist()
+        )
+        
+        st.error(
+            "After merging replicate temperatures, "
+            f"only {len(remaining_temps)} distinct temperature(s) remain: "
+            f"{remaining_temps}. "
+            "At least two distinct temperatures are required."
+        )
+        
+        st.stop()
+    
+
+
+    
+    with tab_lowtemp:
+    
+         
+        st.subheader("Low Temperature Properties")
+        
+        bbr_temperature_results.reset_index(drop=True, inplace=True)
+        st.dataframe(bbr_temperature_results , hide_index = True)
+        
+        reference_temperature = (
+        bbr_temperature_results.loc[0, 'Temperature (C)'])
+        
+        analysis_temps = np.sort(
+            bbr_temperature_results['Temperature (C)'].to_numpy()
+        )
+        
+        
+        if len(bbr_temperature_results)<2:
+            
+            st.warning("Upload at least two BBR datasets obtained at distinct test temperatures.")
+            
+        elif np.ptp(analysis_temps) < 1:
+        
+            st.warning(
+                "The temperature range is small. Arrhenius fitting may be less reliable."
+            )
+    
+        else:
+            low_temp = calculate_low_temperature_properties(
+                bbr_temperature_results
+            )
+            
+            T_s = low_temp["Tc_S"]
+            T_m = low_temp["Tc_m"]
+            Delta_Tc = low_temp["Delta_Tc"]
+            
+            st.write(f"**$T_{{{'c,S'}}}$: {T_s} °C**")
+            st.write(f"**$T_{{{'c,m'}}}$: {T_m} °C**")
+            st.write(f"**$Δ T_{'c'}$: {Delta_Tc} °C**")
+
+        
+        
+    with tab_tts:
+
         st.subheader("**Time-Temperature Superposition (TTS) Using the Arrhenius Model**")
         
         st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {reference_temperature} °C**")           
@@ -2034,13 +2270,17 @@ if st.button("Generate DSR Results"):
         st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$**")
         st.write("**Please note that the temperature is converted to Kelvin, and 'ln' in the function refers to the natural logarithm.**")
         st.write(f"**An $r^{2}$ value below 0.98 may indicate inconsistency in the BBR data and should prompt further review of the test results.**")
-        
+    
         st.markdown("""---""")
-        
+    
         master_curve_fig = create_master_curve_plot(master_curve_series, reference_temperature)
         st.pyplot(master_curve_fig)
+        
+    with tab_dsr:
+    
+        
 
-        st.markdown("""---""")
+        #st.markdown("""---""")
         st.subheader("**Creep Compliance Master Curve, Generalized Power Law (GPL)**")
         
         gpl = compute_gpl(
@@ -2145,8 +2385,11 @@ if st.button("Generate DSR Results"):
                 f"**The glassy modulus ($G_g$) was fixed at "
                 f"{glassy_modulus_CA/1000:.2f} GPa during the CA model fit.**"
             )
+    
+    #st.markdown("""---""")
         
-        st.markdown("""---""")
+    with tab_performance:
+    
         st.subheader("**Glover-Rowe Parameter, Cracking Performance**")
 
     
@@ -2258,9 +2501,11 @@ if st.button("Generate DSR Results"):
         
         st.pyplot(pavel_kriz_fig)
         
+    with tab_animation:
+    
         if generate_animation:
 
-            st.markdown("""---""")
+            
             st.subheader("**Animated Master Curve Shifting**")
 
             
