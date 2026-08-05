@@ -1443,7 +1443,7 @@ def create_glover_rowe_plot(
                 alpha=0.3,
                 zorder=3,
                 bbox=dict(
-                    facecolor='white',
+                    facecolor='#F8F8F8',
                     alpha=0.5,
                     edgecolor='none'
                 )
