@@ -55,6 +55,8 @@ DISPLAY_DPI = 450
 RI_LINES = np.arange(1,4.5,0.5)
 
 REPLICATE_TEMPERATURE_TOLERANCE = 0.1
+BBR_REPEATABILITY_S = 9.1    # 9.1%
+BBR_REPEATABILITY_M = 4.0    # 4%
 
 
 plt.rcParams.update({
@@ -1200,6 +1202,25 @@ def create_low_temperature_properties_plot(
     fig.suptitle(
         f'$ΔT_c$ = {low_temp["Delta_Tc"]:.1f} °C'
     )
+    
+    
+    temp_min = int(
+    6 * np.floor(
+        bbr_temperature_results['Temperature (C)'].min() / 6
+    )
+        )
+    
+    temp_max = int(
+        6 * np.ceil(
+            bbr_temperature_results['Temperature (C)'].max() / 6
+        )
+    ) + 6
+    
+    
+    ticks = np.arange(temp_min, temp_max, 3)
+    
+    ax1.set_xticks(ticks)
+    ax2.set_xticks(ticks)
 
     ax1.legend()
     ax2.legend()
@@ -1766,8 +1787,13 @@ def render_animation_to_video(
 
 def calculate_stiffness_curve(T1, bbr_temperature_results):
     coeffs = bbr_temperature_results.loc[
-        bbr_temperature_results['Temperature (C)'] == T1,
-        ['A', 'B', 'C']]
+    np.isclose(
+        bbr_temperature_results['Temperature (C)'],
+        T1,
+        atol=1e-6
+    ),
+    ['A', 'B', 'C']
+]
     return 10**(coeffs @ POLY_MATRIX)
 
 def build_stiffness_cache(bbr_temperature_results):
@@ -1784,13 +1810,25 @@ def build_stiffness_cache(bbr_temperature_results):
 
 
 def shift_factor_error(T1, T2, a, bbr_temperature_results):
+    
     coeffs_T1 = bbr_temperature_results.loc[
-        bbr_temperature_results['Temperature (C)'] == T1,
-        ['A', 'B', 'C']]
+        np.isclose(
+            bbr_temperature_results['Temperature (C)'],
+            T1,
+            atol=1e-6
+        ),
+        ['A','B','C']
+    ]
     
     coeffs_T2 = bbr_temperature_results.loc[
-        bbr_temperature_results['Temperature (C)'] == T2,
-        ['A', 'B', 'C']]
+        np.isclose(
+            bbr_temperature_results['Temperature (C)'],
+            T2,
+            atol=1e-6
+        ),
+        ['A','B','C']
+    ]
+    
 
     stiffness_T1 = 10**(coeffs_T1@ POLY_MATRIX)
     stiffness_T2 = 10**(coeffs_T2@ POLY_MATRIX)
@@ -1827,6 +1865,9 @@ def gpl_objective(
     creep_comp_calc = (
         10**logD0
         + 10**logD1 * reduced_time**m)
+    
+    if np.any(creep_comp_calc <= 0):
+        return np.inf
 
     return np.sum(
         (np.log10(creep_compliance)
@@ -1846,6 +1887,9 @@ def ca_objective(
             1
             + (10**logOmegaC/reduced_omega)**beta
         )**(-1/beta))
+    
+    if np.any(G_calc_CA <= 0):
+        return np.inf
 
     return np.sum(
         (np.log10(G_calc_CA)
@@ -1868,6 +1912,9 @@ def ca_objective_opt(
             (10**logOmegaC / reduced_omega)**beta
         )**(-1/beta)
     )
+    
+    if np.any(G_calc_CA <= 0):
+        return np.inf
 
     return np.sum(
         (
@@ -1947,6 +1994,93 @@ def prepare_animation_data(
         "stiffness_cache":
             build_stiffness_cache(bbr_temperature_results)
     }
+
+
+def evaluate_replicate_repeatability(
+    bbr_temperature_results,
+    tolerance=REPLICATE_TEMPERATURE_TOLERANCE,
+    s_limit=BBR_REPEATABILITY_S,
+    m_limit=BBR_REPEATABILITY_M
+):
+
+    grouped_results = []
+
+    used = np.zeros(len(bbr_temperature_results), dtype=bool)
+
+    for idx, row in bbr_temperature_results.iterrows():
+
+        if used[idx]: 
+            continue
+
+        temp = row["Temperature (C)"]
+
+        mask = (
+            np.abs(
+                bbr_temperature_results["Temperature (C)"] - temp
+            )
+            <= tolerance
+        )
+
+        group = bbr_temperature_results[mask].copy()
+
+        used[group.index] = True
+
+        if len(group) < 2:
+            continue
+
+        s_values = group["S(60)"].to_numpy()
+        m_values = group["m-value(60)"].to_numpy()
+
+        s_spread = np.max(s_values) - np.min(s_values)
+        m_spread = np.max(m_values) - np.min(m_values)
+        
+        s_mean = np.mean(s_values)
+        m_mean = np.mean(m_values)
+        
+        if np.isclose(s_mean, 0):
+            s_relative_diff = np.nan
+            s_pass = False
+            
+        else:
+            s_relative_diff = (s_spread/s_mean) * 100
+            s_pass = s_relative_diff <= s_limit
+            
+        if np.isclose(m_mean, 0):
+            m_relative_diff = np.nan
+            m_pass = False
+            
+        else:
+            m_relative_diff = (m_spread/m_mean) * 100
+            m_pass = m_relative_diff <= m_limit
+
+        grouped_results.append(
+            {
+                "Temperature (C)": temp,
+                "Replicates": len(group),
+                
+                "S_relative_diff (%)": round(s_relative_diff, 2),
+                "S_pass": s_pass,
+                
+                "m_relative_diff (%)": round(m_relative_diff, 2),
+                "m_pass": m_pass,
+                
+                "S_spread": s_spread,
+                "m_spread": m_spread,
+                
+                "S_mean": s_mean,
+                "m_mean": m_mean,
+                                
+                "S_std": np.std(s_values, ddof=1)
+                if len(s_values) > 1 else 0,
+
+                "m_std": np.std(m_values, ddof=1)
+                if len(m_values) > 1 else 0,
+                
+            }
+        )
+
+    return pd.DataFrame(grouped_results)
+
 
 
 def merge_replicate_temperatures(
@@ -2125,7 +2259,7 @@ st.sidebar.write("""
 
 st.sidebar.markdown("""---""")
 st.sidebar.subheader("⚠ Important Information")
-# Add some descriptive text in the sidebar
+
 st.sidebar.write("""
     Before using this application, ensure that the test data are accurate, valid, and reproducible.
     Please exercise caution when interpreting the results, as this methodology extrapolates BBR measurements beyond the range directly measured by the instrument. 
@@ -2137,6 +2271,39 @@ st.sidebar.write("""
     These assumptions may not accurately represent the true rheological behavior of all materials and should be considered when interpreting the results.
 """)
 st.sidebar.markdown("""---""")
+
+replicate_temperature_tol = st.sidebar.number_input(
+    "Replicate Temperature Tolerance",
+    min_value=0.0,
+    max_value=1.0,
+    step=0.1,
+    value=float(REPLICATE_TEMPERATURE_TOLERANCE),
+    format="%.1f"
+)
+
+repeatability_s_limit = st.sidebar.number_input(
+    "S(60) Repeatability (d2s%)",
+    min_value=0.0,
+    max_value=100.0,
+    step=0.1,
+    value=float(BBR_REPEATABILITY_S),
+    format="%.1f",
+    help=("Default value is based on D6648 − 08 (Reapproved 2016)")
+)
+
+repeatability_m_limit = st.sidebar.number_input(
+    "m-value(60) Repeatability (d2s%)",
+    min_value=0.0,
+    max_value=100.0,
+    step=0.1,
+    value=float(BBR_REPEATABILITY_M),
+    format="%.1f",
+    help=("Default value is based on D6648 − 08 (Reapproved 2016)")
+)
+
+
+st.sidebar.markdown("""---""")
+
 
 # Add the slider with a custom class for styling
 poissons_ratio = st.sidebar.slider(
@@ -2181,6 +2348,7 @@ pavel_kriz_modulus = st.sidebar.selectbox(
         else "|G*| = 10000 kPa (10 MPa)"
     )
 )
+
 
 st.sidebar.markdown("""---""")
 
@@ -2364,11 +2532,21 @@ if st.session_state.analysis_complete:
     
     try:
         
+        repeatability_results = (
+            evaluate_replicate_repeatability(
+                st.session_state.bbr_temperature_results,
+                tolerance = replicate_temperature_tol,        
+                s_limit = repeatability_s_limit,
+                m_limit = repeatability_m_limit
+            )
+        )
+        
+        
         bbr_temperature_results, replicate_messages = (
             merge_replicate_temperatures(
                 st.session_state.bbr_temperature_results,
                 st.session_state.bbr_curve_results,
-                tolerance=REPLICATE_TEMPERATURE_TOLERANCE
+                tolerance=replicate_temperature_tol
             )
         )
         
@@ -2411,7 +2589,21 @@ if st.session_state.analysis_complete:
     with tab_lowtemp:
     
          
-        st.subheader("Low Temperature Properties")
+        st.header("Low Temperature Properties")
+        
+        if not repeatability_results.empty:
+
+            st.subheader(
+                "Replicate Repeatability Check"
+            )
+        
+            st.dataframe(
+                repeatability_results,
+                hide_index=True
+            )
+        
+        
+        st.subheader("BBR Results")
         
         bbr_temperature_results.reset_index(drop=True, inplace=True)
         st.dataframe(bbr_temperature_results , hide_index = True)
@@ -2480,7 +2672,9 @@ if st.session_state.analysis_complete:
         
     with tab_tts:
 
-        st.subheader("**Time-Temperature Superposition (TTS) Using the Arrhenius Model**")
+        st.header("**Time-Temperature Superposition (TTS)**")
+        
+        st.subheader("**Arrhenius Model**")
         
         st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {reference_temperature} °C**")           
        
@@ -2537,7 +2731,7 @@ if st.session_state.analysis_complete:
         
     with tab_dsr:
     
-        
+        st.header("**DSR Data Transformation**")
 
         #st.markdown("""---""")
         st.subheader("**Creep Compliance Master Curve, Generalized Power Law (GPL)**")
@@ -2648,6 +2842,8 @@ if st.session_state.analysis_complete:
     #st.markdown("""---""")
         
     with tab_performance:
+        
+        st.header("**Intermediate Temperature Performance**")
     
         st.subheader("**Glover-Rowe Parameter, Cracking Performance**")
 
@@ -2765,7 +2961,7 @@ if st.session_state.analysis_complete:
         if generate_animation:
 
             
-            st.subheader("**Animated Master Curve Shifting**")
+            st.header("**Animated Master Curve Shifting**")
 
             
             animation_data = prepare_animation_data(
