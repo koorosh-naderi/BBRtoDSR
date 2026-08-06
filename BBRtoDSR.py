@@ -50,7 +50,7 @@ FATIGUE_LIMIT_ALT = 6000
 PAVEL_KRIZ_MODULUS_ORIGINAL = 6000 / np.sin(np.deg2rad(42))
 PAVEL_KRIZ_MODULUS_10MPA = 10000
 
-DISPLAY_DPI = 450
+DISPLAY_DPI = 300
 
 RI_LINES = np.arange(1,4.5,0.5)
 
@@ -2260,6 +2260,7 @@ st.sidebar.write("""
 st.sidebar.markdown("""---""")
 st.sidebar.subheader("⚠ Important Information")
 
+# Description
 st.sidebar.write("""
     Before using this application, ensure that the test data are accurate, valid, and reproducible.
     Please exercise caution when interpreting the results, as this methodology extrapolates BBR measurements beyond the range directly measured by the instrument. 
@@ -2272,6 +2273,7 @@ st.sidebar.write("""
 """)
 st.sidebar.markdown("""---""")
 
+# BBR Validity Checks
 replicate_temperature_tol = st.sidebar.number_input(
     "Replicate Temperature Tolerance",
     min_value=0.0,
@@ -2305,7 +2307,7 @@ repeatability_m_limit = st.sidebar.number_input(
 st.sidebar.markdown("""---""")
 
 
-# Add the slider with a custom class for styling
+# DSR Analysis Option
 poissons_ratio = st.sidebar.slider(
     "Select Poisson's Ratio:",
     min_value=0.25,  # Minimum value
@@ -2366,7 +2368,7 @@ st.sidebar.markdown("""---""")
 
 
 
-# Add a footer or additional text
+# Contact Text
 st.sidebar.markdown("✉ Contact Me")
 st.sidebar.write("For questions, suggestions, or bug reports, please contact: [koorosh.naderi@colas.com](mailto:koorosh.naderi@colas.com)")
 
@@ -2480,6 +2482,7 @@ with tab_data:
             st.dataframe(bbr_fit_points, hide_index = True)
             fig = create_bbr_fit_plot(bbr_fit_points)
             st.pyplot(fig)
+            plt.close(fig)
             
             analysis_temperature = target_temperature
             
@@ -2502,7 +2505,7 @@ with tab_data:
             ]
             st.success(
         f"Added {uploaded_file.name} at {analysis_temperature:.2f} °C")
-            #st.markdown("""---""")
+            
             
             bbr_curve_results.append(
                                         {
@@ -2641,6 +2644,7 @@ if st.session_state.analysis_complete:
             )
             
             st.pyplot(low_temp_fig)
+            plt.close(low_temp_fig)
             
                         
             col_tcs, col_tcm, col_deltatc = st.columns(3)
@@ -2718,6 +2722,7 @@ if st.session_state.analysis_complete:
                                         r_squared_Arrhenius
                                     )
         st.pyplot(arrhenius_fig)
+        plt.close(arrhenius_fig)
         
         st.write(f"**$E_{'a'}$: {round(activation_energy, 3)} kJ/mol**")
         st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$**")
@@ -2728,12 +2733,13 @@ if st.session_state.analysis_complete:
     
         master_curve_fig = create_master_curve_plot(master_curve_series, reference_temperature)
         st.pyplot(master_curve_fig)
+        plt.close(master_curve_fig)
         
     with tab_dsr:
     
         st.header("**DSR Data Transformation**")
 
-        #st.markdown("""---""")
+        
         st.subheader("**Creep Compliance Master Curve, Generalized Power Law (GPL)**")
         
         gpl = compute_gpl(
@@ -2773,6 +2779,7 @@ if st.session_state.analysis_complete:
             )
             
         st.pyplot(gpl_fig)
+        plt.close(gpl_fig)
 
 
         st.markdown("""---""")
@@ -2827,6 +2834,7 @@ if st.session_state.analysis_complete:
         )
         
         st.pyplot(ca_fig)
+        plt.close(ca_fig)
 
         if optimize_glassy_modulus:
             st.write(
@@ -2839,7 +2847,7 @@ if st.session_state.analysis_complete:
                 f"{glassy_modulus_CA/1000:.2f} GPa during the CA model fit.**"
             )
     
-    #st.markdown("""---""")
+    
         
     with tab_performance:
         
@@ -2871,6 +2879,7 @@ if st.session_state.analysis_complete:
         )
         
         st.pyplot(gr_fig)
+        plt.close(gr_fig)
 
         st.write("""**The Glover-Rowe parameter, which is based on the DSR Fn proposed by [Glover et al.](https://rosap.ntl.bts.gov/view/dot/81884), was originally developed to relate dynamic rheological properties in shear mode to tensile failure strain (ductility) in tension mode for pure or unmodified bitumen (asphalt binder). 
                  For polymer-modified binders, caution is advised, as elevated Glover-Rowe values do not necessarily correspond to reduced ductility or increased cracking susceptibility.**""")
@@ -2921,6 +2930,7 @@ if st.session_state.analysis_complete:
         )
         
         st.pyplot(fatigue_fig)
+        plt.close(fatigue_fig)
 
         st.markdown("""---""")
         st.subheader("**Pavel-Kriz Phase Angle, [Detection of Phase Incompatible Binders](https://trid.trb.org/View/2344464/)**")
@@ -2955,6 +2965,7 @@ if st.session_state.analysis_complete:
         )
         
         st.pyplot(pavel_kriz_fig)
+        plt.close(pavel_kriz_fig)
         
     with tab_animation:
     
