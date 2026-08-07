@@ -18,6 +18,8 @@ import math
 import tempfile
 import os
 from dataclasses import dataclass
+from datetime import datetime
+
 
 #magic numbers
 
@@ -63,6 +65,24 @@ plt.rcParams.update({
     'figure.facecolor': '#F8F8F8',
     'axes.facecolor': '#F8F8F8'
 })
+
+st.markdown(
+    """
+    <style>
+    /* Change the font size of the metric value (the number) */
+    [data-testid="stMetricValue"] {
+        font-size: 1.1rem !important;
+    }
+    
+    /* Change the font size of the metric label (the text above) */
+    [data-testid="stMetricLabel"] p {
+        font-size: 1.0rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
 #-----------------------------------------------------------------
 
@@ -210,8 +230,6 @@ def load_xlsm(uploaded_file):
             * beam_thickness**3
         )
     )
-    
-    #bbr_data['Stiffness (MPa)'] = 1/1000000*(np.float64(bbr_data['Force (mN)'])*beam_span**3)/(np.float64(bbr_data['Deflection (mm)'])*4*beam_width*beam_thickness**3)
     
     bbr_data, bbr_fit_points, bbr_fit_model = fit_bbr_curve(bbr_data)
     
@@ -550,7 +568,12 @@ def compute_gpl(
         args=(
             reduced_time,
             creep_compliance
-        )
+        ), bounds=[
+            (0.01, 1.0),
+            (None, None),
+            (None, None)
+            ]
+        
     )
 
     newtime = 10**np.linspace(
@@ -825,7 +848,7 @@ def compute_fatigue(
             beta,
             logOmegaC,
             glassy_modulus
-        )
+        ), bounds=[(-40,120)]
     )
 
     result_T_fatigue_6000 = minimize(
@@ -838,7 +861,7 @@ def compute_fatigue(
             beta,
             logOmegaC,
             glassy_modulus
-        )
+        ), bounds=[(-40,120)]
     )
 
     omega_fatigue6_superpave = 10
@@ -996,7 +1019,7 @@ def compute_pavel_kriz(
             logOmegaC,
             glassy_modulus,
             target_modulus
-        )
+        ), bounds=[(-40,120)]
     )
 
     temperature = result_T_pavel_kriz.x[0]
@@ -1072,7 +1095,7 @@ def create_arrhenius_plot(
     temperature_list,
     shift_factor_values,
     arrhenius_values,
-    r_squared_arrhenius
+    r_squared_Arrhenius
 ):
 
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
@@ -1110,7 +1133,7 @@ def create_arrhenius_plot(
     fig.text(
         0.50,
         0.55,
-        f'$r^2$ = {round(r_squared_arrhenius, 3)}'
+        f'$r^2$ = {round(r_squared_Arrhenius, 3)}'
     )
 
     handles, labels = ax.get_legend_handles_labels()
@@ -1530,7 +1553,7 @@ def create_fatigue_plot(
         linestyle='None',
         marker='o',
         alpha=0.7,
-        markersize=2,
+        markersize=3,
         c='#EE7402'
     )
 
@@ -1544,7 +1567,7 @@ def create_fatigue_plot(
         ),
         label='|G*|sinδ = 5000 kPa',
         linestyle='--',
-        c='black'
+        c='#C0CE2E'
     )
 
     ax.plot(
@@ -1557,8 +1580,8 @@ def create_fatigue_plot(
         ),
         label='|G*|sinδ = 6000 kPa',
         linestyle='-.',
-        c='black',
-        alpha=0.3
+        c='#A3186D',
+        
     )
 
     ax.set_title('Black Diagram')
@@ -1568,7 +1591,7 @@ def create_fatigue_plot(
 
     ax.set_yscale('log')
 
-    ax.set_ylim(1,1e6)
+    ax.set_ylim(1e1,1e6)
 
     ax.set_xlim(0,90)
 
@@ -1578,7 +1601,7 @@ def create_fatigue_plot(
         Temperature_fatigue_list
     ):
         ax.text(
-            x,
+            x+1,
             y,
             f"{z}°C",
             fontsize=7
@@ -1622,7 +1645,7 @@ def create_pavel_kriz_plot(
         ymin=pavel_kriz_modulus,
         ymax=1e6,
         linestyle='dashdot',
-        colors='black',
+        colors='#A3186D',
         label='Pavel-Kriz Criteria'
     )
 
@@ -2242,12 +2265,397 @@ def merge_replicate_temperatures(
     ), messages
 
 
+def find_bracketed_pg_temperatures(
+    bbr_temperature_results,
+    min_grade=-42,
+    max_grade=-6
+):
+    """
+    Returns only standard PG temperatures
+    that are bracketed by measured data.
+    """
+
+    temps = np.sort(
+        bbr_temperature_results[
+            "Temperature (C)"
+        ].to_numpy()
+    )
+
+    pg_temps = np.arange(
+        min_grade,
+        max_grade + 6,
+        6
+    )
+
+    bracketed = []
+
+    for T in pg_temps:
+
+        if temps.min() <= T <= temps.max():
+
+            bracketed.append(T)
+
+    return bracketed
+
+
+def interpolate_pg_property(
+    temperatures,
+    values,
+    target_temperature,
+    log_scale=False
+):
+    """
+    Interpolate using only the two temperatures
+    bracketing target_temperature.
+
+    log_scale=True is intended for S(60).
+    """
+
+    temperatures = np.asarray(temperatures)
+    values = np.asarray(values)
+
+    # Exact match
+    idx = np.where(
+        np.isclose(
+            temperatures,
+            target_temperature,
+            atol=1e-6
+        )
+    )[0]
+
+    if len(idx):
+
+        return values[idx[0]]
+
+    lower_mask = temperatures < target_temperature
+    upper_mask = temperatures > target_temperature
+
+    if (
+        not np.any(lower_mask)
+        or
+        not np.any(upper_mask)
+    ):
+        return None
+
+    lower_idx = np.where(lower_mask)[0].max()
+    upper_idx = np.where(upper_mask)[0].min()
+
+    T1 = temperatures[lower_idx]
+    T2 = temperatures[upper_idx]
+
+    V1 = values[lower_idx]
+    V2 = values[upper_idx]
+
+    if log_scale:
+
+        return 10**(
+            np.interp(
+                target_temperature,
+                [T1, T2],
+                [np.log10(V1), np.log10(V2)]
+            )
+        )
+
+    return np.interp(
+        target_temperature,
+        [T1, T2],
+        [V1, V2]
+    )
+
+
+def create_pg_grading_table(
+    bbr_temperature_results
+):
+    """
+    Creates interpolated table at
+    standard PG temperatures.
+    """
+
+    df = (
+        bbr_temperature_results
+        .sort_values("Temperature (C)")
+        .reset_index(drop=True)
+    )
+
+    grade_temps = (
+        find_bracketed_pg_temperatures(df)
+    )
+
+    rows = []
+
+    temps = df["Temperature (C)"].to_numpy()
+
+    stiffness = df["S(60)"].to_numpy()
+
+    mvalues = df["m-value(60)"].to_numpy()
+
+    for T in grade_temps:
+
+        S_interpol = interpolate_pg_property(
+            temps,
+            stiffness,
+            T,
+            log_scale=True
+        )
+
+        m_interpol = interpolate_pg_property(
+            temps,
+            mvalues,
+            T,
+            log_scale=False
+        )
+
+        if S_interpol <= 300:
+            s_status = "✅"
+        elif S_interpol <= 600:
+            s_status = "⚠️"
+        else:
+            s_status = "❌"
+
+        m_status = (
+            "✅"
+            if m_interpol >= 0.300
+            else "❌"
+        )
+
+        rows.append(
+            {
+                "Temperature (C)": T,
+                "S(60)": int(round(S_interpol,0)),
+                "m-value(60)": round(m_interpol,3),
+                "S": s_status,
+                "m": m_status
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+
+def determine_pg_grade(
+    pg_table
+):
+    """
+    Determines PG grade from
+    grading table.
+    """
+
+    table = (
+        pg_table
+        .sort_values(
+            "Temperature (C)"
+        )
+        .reset_index(drop=True)
+    )
+
+    for _, row in table.iterrows():
+
+        s_status = row["S"]
+        m_status = row["m"]
+
+        if m_status != "✅":
+            continue
+
+        if s_status == "✅":
+
+            return {
+                "pg_grade":
+                    int(
+                        row["Temperature (C)"]
+                    ) - 10,
+                "dt_required": False,
+                "message":
+                    "BBR requirements satisfied."
+            }
+
+        if s_status == "⚠️":
+
+            return {
+                "pg_grade":
+                    int(
+                        row["Temperature (C)"]
+                    ) - 10,
+                "dt_required": True,
+                "message":
+                    "Direct Tension testing required."
+            }
+
+    return {
+        "pg_grade": None,
+        "dt_required": False,
+        "message":
+            "No passing grade found."
+    }
+
+#--------------------------------------------------------------------------------------------
+
+def show_assessment(
+    result,
+    container=st,
+    prefix=""
+    ):
+    
+        message_functions = {
+            "success": container.success,
+            "warning": container.warning,
+            "error": container.error,
+            "info": container.info
+        }
+    
+        text = (
+            f"{prefix}{result['symbol']} "
+            f"{result['text']}"
+        )
+    
+        message_functions.get(
+            result["level"],
+            container.info
+        )(text)
+
+
+
+def classify_delta_tc(delta_tc):
+
+    if delta_tc >= -2.5:
+        return {
+            "text": "Low embrittlement risk",
+            "level": "success",
+            "symbol": "✅"
+        }
+
+    elif delta_tc >= -5:
+        return {
+            "text": "Moderate embrittlement concern",
+            "level": "warning",
+            "symbol": "⚠️"
+        }
+
+    return {
+        "text": "High embrittlement risk",
+        "level": "error",
+        "symbol": "❌"
+    }
+
+
+
+def classify_g_r(g_r):
+
+    if g_r <= 180:
+        return {
+            "text": "Low embrittlement risk",
+            "level": "success",
+            "symbol": "✅"
+        }
+
+    elif g_r <= 600:
+        return {
+            "text": "Moderate embrittlement concern",
+            "level": "warning",
+            "symbol": "⚠️"
+        }
+
+    return {
+        "text": "High embrittlement risk",
+        "level": "error",
+        "symbol": "❌"
+    }
+
+def classify_p_k(p_k):
+
+    if p_k >= 42:
+        return {
+            "text": "Low cracking risk",
+            "level": "success",
+            "symbol": "✅"
+        }
+
+    return {
+        "text": "High cracking risk",
+        "level": "error",
+        "symbol": "❌"
+    }
+
+
+def build_executive_summary(
+    delta_tc_result,
+    g_r_result,
+    p_k_result
+):
+
+    results = [
+        ("ΔTc", delta_tc_result),
+        ("G-R", g_r_result),
+        ("Pavel-Kriz", p_k_result)
+    ]
+
+    failures = [
+        name
+        for name, result in results
+        if result["level"] == "error"
+    ]
+
+    warnings = [
+        name
+        for name, result in results
+        if result["level"] == "warning"
+    ]
+
+    if len(failures) >= 2:
+
+        overall = {
+            "symbol": "❌",
+            "level": "error",
+            "text": (
+                f"{len(failures)} of 3 durability indicators "
+                "indicate elevated cracking or embrittlement risk."
+            )
+        }
+
+    elif failures or warnings:
+
+        overall = {
+            "symbol": "⚠️",
+            "level": "warning",
+            "text": (
+                "At least one durability indicator warrants "
+                "additional engineering review."
+            )
+        }
+
+    else:
+
+        overall = {
+            "symbol": "✅",
+            "level": "success",
+            "text": (
+                "All evaluated durability indicators are within "
+                "favorable ranges."
+            )
+        }
+
+    details = (
+        f"$ΔT_c$: {delta_tc_result['text']}; "
+        f"$G-R$: {g_r_result['text']}; "
+        f"$Pavel-Kriz$: {p_k_result['text']}."
+    )
+
+    return {
+        "text": overall["text"],
+        "level": overall["level"],
+        "symbol": overall["symbol"],
+        "details": details
+    }
+
 
 
 # Streamlit app layout
 st.title("BBRtoDSR Rheological Analysis Tool (Beta)")
 
-st.logo("icon.png", size="large")
+with st.bottom:
+    st.caption("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/). All rights reserved.")
+
+
+#st.logo("icon.png", size="large")
 
 
 # Create a sidebar
@@ -2269,7 +2677,7 @@ st.sidebar.write("""
     the validity of [Generalized Power Law behavior for creep compliance at low temperatures](https://www.fhwa.dot.gov/publications/research/infrastructure/pavements/ltpp/10035/009.cfm), 
     the temperature and frequency independence of Poisson's ratio, 
     and the applicability of the [Christensen–Anderson (CA) model](https://doi.org/10.1080/14680629.2016.1267448) for complex modulus and phase angle master curves. 
-    These assumptions may not accurately represent the true rheological behavior of all materials and should be considered when interpreting the results.
+    These assumptions may not accurately represent the rheological behavior of all materials and should be considered when interpreting the results.
 """)
 st.sidebar.markdown("""---""")
 
@@ -2310,8 +2718,8 @@ st.sidebar.markdown("""---""")
 # DSR Analysis Option
 poissons_ratio = st.sidebar.slider(
     "Select Poisson's Ratio:",
-    min_value=0.25,  # Minimum value
-    max_value=0.5,   # Maximum value
+    min_value=0.25,  # Minimum-value
+    max_value=0.5,   # Maximum-value
     value=0.50,      # Default value
     step=0.05,       # Step value for the slider
     format="%.2f",   # Format the displayed value
@@ -2354,12 +2762,12 @@ pavel_kriz_modulus = st.sidebar.selectbox(
 
 st.sidebar.markdown("""---""")
 
-generate_animation = st.sidebar.checkbox(
+generate_animation = st.sidebar.toggle(
     "Generate master curve animation",
     value=True
 )
 
-show_RI_contours = st.sidebar.checkbox(
+show_RI_contours = st.sidebar.toggle(
     "Show Rheological Index contours on the black diagram",
     value=True
 )
@@ -2390,24 +2798,17 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 
-st.image("BBRtoDSRv1.jpeg")
-st.write("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/)")
+#st.image("BBRtoDSRv1.jpeg")
 
 
-
-
-
-
-
-
-
-tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation = st.tabs([
+tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation, tab_reporting = st.tabs([
     "Data",
-    "Low Temperature Properties",
+    "LT Properties",
     "TTS",
     "DSR Transformation",
-    "Intermediate Temperature Performance",
-    "Animation"
+    "IT Performance",
+    "Animation",
+    "Reporting"
 ])
 
 
@@ -2545,6 +2946,7 @@ if st.session_state.analysis_complete:
         )
         
         
+        
         bbr_temperature_results, replicate_messages = (
             merge_replicate_temperatures(
                 st.session_state.bbr_temperature_results,
@@ -2553,6 +2955,15 @@ if st.session_state.analysis_complete:
             )
         )
         
+        pg_table = create_pg_grading_table(
+            bbr_temperature_results
+        )
+        
+        pg_result = determine_pg_grade(
+            pg_table
+        )
+        
+        
     except Exception as e:
         
         st.error(str(e))
@@ -2560,12 +2971,11 @@ if st.session_state.analysis_complete:
     
     bbr_temperature_results = (
         bbr_temperature_results
-        .sort_values("Temperature (C)", ascending=False)
+        .sort_values("Temperature (C)", ascending = False)
         .reset_index(drop=True)
     )
     
-    for msg in replicate_messages:
-        st.info(msg)
+    
     
     if len(bbr_temperature_results) < 2:
         
@@ -2584,15 +2994,15 @@ if st.session_state.analysis_complete:
         
         st.stop()
     
-    st.success(
-    "Analysis successfully started. Navigate through the tabs to review them."
+    st.toast(
+    "Analysis started. Navigate through the tabs to review the analysis."
     )
     
     
     with tab_lowtemp:
     
          
-        st.header("Low Temperature Properties")
+        st.header("Low-Temperature Properties")
         
         if not repeatability_results.empty:
 
@@ -2626,7 +3036,7 @@ if st.session_state.analysis_complete:
         elif np.ptp(analysis_temps) < 1:
         
             st.warning(
-                "The temperature range is small. Arrhenius fitting may be less reliable."
+                "The temperature range is narrow. Arrhenius fitting may be less reliable."
             )
     
         else:
@@ -2644,33 +3054,38 @@ if st.session_state.analysis_complete:
             )
             
             st.pyplot(low_temp_fig)
-            plt.close(low_temp_fig)
+            #plt.close(low_temp_fig)
             
                         
             col_tcs, col_tcm, col_deltatc = st.columns(3)
             
             with col_tcs:
-                st.metric(f"$T_{{{'c,S'}}}$", f"{T_s:.1f} °C",border=True)
+                st.metric(f"$T_{{{'c,S'}}}$", f"{T_s:.1f} °C",border=True, icon=":material/thermostat:")
             with col_tcm:
-                st.metric(f"$T_{{{'c,m'}}}$", f"{T_m:.1f} °C",border=True)
+                st.metric(f"$T_{{{'c,m'}}}$", f"{T_m:.1f} °C",border=True, icon=":material/thermostat:")
             with col_deltatc:
-                st.metric(f"$Δ T_{'c'}$", f"{Delta_Tc} °C",border=True)
+                st.metric(f"$Δ T_{'c'}$", f"{Delta_Tc} °C",border=True, icon=":material/crisis_alert:")
             
-            if Delta_Tc > -2.5:
-                col_deltatc.success("✅️ Low embrittlement risk")
+            delta_tc_result = classify_delta_tc(Delta_Tc)
+
+            show_assessment(
+                delta_tc_result,
+                col_deltatc
+            )
             
-            elif Delta_Tc > -5:
-                col_deltatc.warning("⚠️ Intermediate concern")
-            
-            else:
-                col_deltatc.error("❌ High embrittlement risk")
         
         st.markdown("""---""")        
         
         st.write(f"**Please note that $T_{{{'c,S'}}}$ and $T_{{{'c,m'}}}$ are critical temperatures that have been shifted by −10 °C from the test temperature. "
-                 "This adjustment converts the 60 s test condition to an equivalent 7,200 s stiffness, which was the original criterion for resistance to single-event low-temperature cracking. "
-                 f"Also note that $ΔT_{'c'}$ was introduced to help detect highly aged or waxy bitumen samples. "
-                 f"However, $ΔT_{'c'}$ can be low for polymer-modified binders; a low $ΔT_{'c'}$ does not necessarily indicate a high susceptibility to cracking.**")
+                 "This adjustment converts the 60 s test condition to an equivalent 7,200 s stiffness, which was the original criterion for resistance to single-event low-temperature cracking.**"
+                 "  \n\n"
+                 f"**Also note that $ΔT_{'c'}$ was introduced to help detect highly aged or waxy bitumen samples. "
+                 "In AASHTO R114, this parameter has been reintroduced to assess the embrittlement of the binder found in Reclaimed Asphalt Shingles. "
+                 f"Additionally, other applications have been proposed to link low $ΔT_{'c'}$ to durability concerns observed in the field (< -5 °C). "
+                 f"In any case, $ΔT_{'c'}$ can be low for polymer-modified binders; a low $ΔT_{'c'}$ for modified binder may not necessarily indicate a high susceptibility to cracking.**")
+        
+        for msg in replicate_messages:
+            st.info(msg)
 
         
         
@@ -2722,18 +3137,18 @@ if st.session_state.analysis_complete:
                                         r_squared_Arrhenius
                                     )
         st.pyplot(arrhenius_fig)
-        plt.close(arrhenius_fig)
+        
         
         st.write(f"**$E_{'a'}$: {round(activation_energy, 3)} kJ/mol**")
         st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$**")
-        st.write("**Please note that the temperature is converted to Kelvin, and 'ln' in the function refers to the natural logarithm.**")
+        st.write("**Please note that temperature is expressed in Kelvin and that 'ln' denotes the natural logarithm.**")
         st.write(f"**An $r^{2}$ value below 0.98 may indicate inconsistency in the BBR data and should prompt further review of the test results.**")
     
         st.markdown("""---""")
     
         master_curve_fig = create_master_curve_plot(master_curve_series, reference_temperature)
         st.pyplot(master_curve_fig)
-        plt.close(master_curve_fig)
+        
         
     with tab_dsr:
     
@@ -2747,6 +3162,7 @@ if st.session_state.analysis_complete:
                             stiffness_list
                          )
         m = gpl["m"]
+        
         logD0 = gpl["logD0"]
         logD1 = gpl["logD1"]
         
@@ -2779,7 +3195,7 @@ if st.session_state.analysis_complete:
             )
             
         st.pyplot(gpl_fig)
-        plt.close(gpl_fig)
+        
 
 
         st.markdown("""---""")
@@ -2834,7 +3250,7 @@ if st.session_state.analysis_complete:
         )
         
         st.pyplot(ca_fig)
-        plt.close(ca_fig)
+        
 
         if optimize_glassy_modulus:
             st.write(
@@ -2867,6 +3283,8 @@ if st.session_state.analysis_complete:
         phase_gr = gr["phase_gr"]
         g_gr = gr["g_gr"]
         g_r = gr["g_r"]
+        
+        g_r_classify_result = classify_g_r(g_r)
 
         st.write(f"**$G-R$: {round(g_r,0)} kPa**")
         st.write(f"**$|G^{'*'}|_{{{'G-R'}}}$: {round(g_gr,0)} kPa**")
@@ -2879,7 +3297,7 @@ if st.session_state.analysis_complete:
         )
         
         st.pyplot(gr_fig)
-        plt.close(gr_fig)
+        #plt.close(gr_fig)
 
         st.write("""**The Glover-Rowe parameter, which is based on the DSR Fn proposed by [Glover et al.](https://rosap.ntl.bts.gov/view/dot/81884), was originally developed to relate dynamic rheological properties in shear mode to tensile failure strain (ductility) in tension mode for pure or unmodified bitumen (asphalt binder). 
                  For polymer-modified binders, caution is advised, as elevated Glover-Rowe values do not necessarily correspond to reduced ductility or increased cracking susceptibility.**""")
@@ -2930,7 +3348,7 @@ if st.session_state.analysis_complete:
         )
         
         st.pyplot(fatigue_fig)
-        plt.close(fatigue_fig)
+        
 
         st.markdown("""---""")
         st.subheader("**Pavel-Kriz Phase Angle, [Detection of Phase Incompatible Binders](https://trid.trb.org/View/2344464/)**")
@@ -2946,6 +3364,8 @@ if st.session_state.analysis_complete:
         
         temperature_pavel_kriz = pavel_kriz["temperature"]
         phase_pavel_kriz = pavel_kriz["phase"]
+        
+        p_k_classify_result = classify_p_k(phase_pavel_kriz)
 
 
         st.write("ω = 10 Rad/s")
@@ -2972,7 +3392,7 @@ if st.session_state.analysis_complete:
         if generate_animation:
 
             
-            st.header("**Animated Master Curve Shifting**")
+            st.header("**Animated Time-Temperature Superposition**")
 
             
             animation_data = prepare_animation_data(
@@ -3011,3 +3431,267 @@ if st.session_state.analysis_complete:
             )
             
             st.video(video_bytes)
+            
+    with tab_reporting:
+        with st.container():
+            
+            st.header('BBRtoDSR Rheological Analysis Report')
+            
+            st.caption(
+                    f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                    )
+            
+            st.divider()
+            
+            st.subheader('Executive Summary')
+            
+            executive_summary = build_executive_summary(
+                delta_tc_result,
+                g_r_classify_result,
+                p_k_classify_result
+            )
+            
+            show_assessment(
+                executive_summary,
+                prefix="Overall Assessment: "
+            )
+            
+            st.write(executive_summary["details"])
+            
+
+
+            st.divider()
+            
+            
+            st.subheader('Sample Summary')
+            
+            sample_summary = pd.DataFrame({
+                "Item": [
+                    "Files Analyzed",
+                    "Distinct Test Temperatures",
+                    "Reference Temperature ($T_{{{ref}}}$)",
+                    "Replicate Groups Merged",
+                    "Temperature Range",
+                    "Poisson's Ratio",
+                    "Glassy Modulus ($G_g$)"
+                ],
+                "Value": [
+                    len(st.session_state.uploaded_files),
+                    len(bbr_temperature_results),
+                    f"{reference_temperature:.1f} °C",
+                    len(st.session_state.uploaded_files) - len(bbr_temperature_results),
+                    f"{np.ptp(analysis_temps):.1f} °C",
+                    f"{poissons_ratio:.2f}",
+                    f"{glassy_modulus_CA:.0f} MPa"
+                ]
+            })
+            
+            
+            st.table(
+                sample_summary,
+                border="horizontal"
+            )
+            
+            
+            
+            
+            st.divider()
+            
+            st.subheader(
+                "Low-Temperature Performance Grading - AASHTO R29"
+            )
+            
+            
+            st.table(
+                pg_table,
+                border="horizontal"
+            )
+            
+            st.write(
+                f"Low-Temperature PG Grade: {pg_result['pg_grade']}"
+            )
+            
+            if pg_result["dt_required"]:
+                st.warning(pg_result["message"])
+            else:
+                st.success(pg_result["message"])
+                
+            st.divider()
+            
+            st.subheader(
+                "Low-Temperature Performance Parameters - Continuous PG - AASHTO R114"
+            )
+            
+            str_t_cs = f"$T_{{{'c,S'}}}$"
+            str_t_cm = f"$T_{{{'c,m'}}}$"
+            str_del_tc = f"$Δ T_{'c'}$"
+            
+            
+            low_temp_perf_summary = pd.DataFrame({
+                "Item": [
+                    str_t_cs,
+                    str_t_cm,
+                    str_del_tc
+                ],
+                "Value": [
+                    f"{T_s:.1f} °C",
+                    f"{T_m:.1f} °C",
+                    f"{Delta_Tc} °C"
+                ]
+            })
+          
+            st.table(
+                low_temp_perf_summary,
+                border="horizontal"
+            )
+            
+            low_temp_perf_summary_a, low_temp_perf_summary_b, low_temp_perf_summary_c = st.columns(3)
+            
+            
+            low_temp_perf_summary_a.metric(f"$Δ T_{'c'}$", ">-2.5°C", delta="low embrittlement risk", delta_color="green", delta_arrow="down", border=True)
+            low_temp_perf_summary_b.metric(f"$Δ T_{'c'}$", "<-2.5°C \u2800 & \u2800 >-5°C", delta ="moderate embrittlement risk", delta_color = "yellow", delta_arrow ='off', border=True)
+            low_temp_perf_summary_c.metric(f"$Δ T_{'c'}$", "<-5°C",delta ="high embrittlement risk",delta_color = "red",border=True)
+            
+            
+            show_assessment(
+                delta_tc_result,
+                prefix=f"Assessment based on $Δ T_{'c'}$ parameter: "
+            )
+            
+            st.pyplot(low_temp_fig)
+            
+            
+            
+            st.divider()
+            
+            st.subheader(
+                "Time-Temperature Superposition, Generalized Power Law, and Christensen–Anderson Models"
+            )
+            
+            tts_summary = pd.DataFrame({
+                "Item": [
+                    "Activation Energy $E_a$",
+                    "Arrhenius $R^2$",
+                    "GPL m",
+                    "logD₀",
+                    "logD₁",
+                    "GPL $R^2$",
+                    "GPL RMSE(log)",
+                    "β",
+                    f"logωC @ $T_{{{'ref'}}}$",
+                    "Rheological Index (R)",
+                    "CA $R^2$",
+                    "CA RMSE(log)"
+                ],
+                "Value": [
+                    f"{round(activation_energy, 3)} kJ/mol",round(r_squared_Arrhenius,4),round(m,3),
+                    round(logD0,3),round(logD1,3),round(r2_gpl,4),
+                    round(rmse_log,4),round(beta,3),round(logOmegaC,3),
+                    round(np.log10(2)/beta, 2),round(r2_CA, 4),round(rmse_CA, 4)
+                ]
+            })
+            
+            
+            st.table(
+                tts_summary,
+                border="horizontal"
+            )
+            
+            fig_tt_left, fig_tt_right = st.columns(2)
+
+            with fig_tt_left:
+                st.pyplot(master_curve_fig)
+                st.pyplot(gpl_fig)
+                
+                
+            with fig_tt_right:
+                st.pyplot(arrhenius_fig)
+                st.pyplot(ca_fig)
+                
+            
+            
+            st.divider()
+            
+            st.subheader(
+                "Glover-Rowe Durability Parameter - Intermediate Temperature / Low Frequency"
+            )
+            
+            g_r_summary = pd.DataFrame({
+                "Item": [
+                    "G-R",
+                    f"$|G^{'*'}|_{{{'G-R'}}}$",
+                    f"$δ_{{{'G-R'}}}$"
+                ],
+                "Value": [
+                    f"{round(g_r,0)} kPa",
+                    f"{round(g_gr,0)} kPa",
+                    f"{round(phase_gr,0)} °"
+                ]
+            })
+            
+            st.table(
+                g_r_summary,
+                border="horizontal"
+            )
+            
+            g_r_summary_a, g_r_summary_b, g_r_summary_c = st.columns(3)
+            
+            g_r_summary_a.metric("G-R", "<180 kPa", delta="low embrittlement risk", delta_color="green", delta_arrow="down", border=True)
+            g_r_summary_b.metric("G-R", ">180 kPa \u2800 & \u2800 <600 kPa", delta ="moderate embrittlement risk", delta_color = "yellow", delta_arrow ='off', border=True)
+            g_r_summary_c.metric("G-R", ">600 kPa",delta ="high embrittlement risk",delta_color = "red",border=True)
+            
+            
+            show_assessment(
+                g_r_classify_result,
+                prefix="Assessment based on G-R parameter: "
+            )
+            
+            st.pyplot(gr_fig)
+            
+            
+            
+            st.divider()
+            
+            st.subheader(
+                "Fatigue Criteria - Intermediate Temperature"
+            )
+            
+            fatigue_str1 = f"**$T_{{{'G"=5000kPa'}}}$**"
+            fatigue_str2 = f"**$T_{{{'G"=6000kPa'}}}$**"
+            fatigue_str3 = f"$δ_{{{'|G*|=' + f'{pavel_kriz_modulus:.0f}' + 'kPa'}}}$"
+            
+            fatigue_summary = pd.DataFrame({
+                "Item": [
+                    fatigue_str1,
+                    fatigue_str2,
+                    fatigue_str3
+                ],
+                "Value": [
+                    f"{round(T5000,1)} °C",
+                    f"{round(T6000,1)} °C",
+                    f"{round(phase_pavel_kriz,1)} °"
+                ]
+            })
+            
+            st.table(
+                fatigue_summary,
+                border="horizontal"
+            )
+            
+            
+            fatigue_col_a, fatigue_col_b = st.columns(2)
+            
+            fatigue_col_a.metric(fatigue_str3, ">42°", delta="low cracking risk", delta_color="green", delta_arrow="down", border=True)
+            fatigue_col_b.metric(fatigue_str3, "<42°", delta ="high cracking risk",delta_color = "red", border=True)
+            
+            
+            show_assessment(
+                p_k_classify_result,
+                prefix="Assessment based on Pavel-Kriz parameter: "
+            )
+            
+            st.pyplot(fatigue_fig)
+            
+            
+            
+    st.toast("Analysis completed! Review the results in the tabs.", icon="⚙️")
