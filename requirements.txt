@@ -2,7 +2,7 @@ ffmpeg-python
 numpy
 pandas
 matplotlib
-streamlit>=1.61.0
+streamlit==1.61.0
 scipy
 openpyxl
 
