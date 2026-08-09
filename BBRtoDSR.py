@@ -93,20 +93,23 @@ class BBRLoadResult:
     bbr_fit_model: np.poly1d
     target_temperature: float
     actual_temperature: float
+    r2_bbr: float
 
 def create_load_result(
     bbr_data,
     bbr_fit_points,
     bbr_fit_model,
     target_temperature,
-    actual_temperature
+    actual_temperature,
+    r2_bbr
 ):
     return BBRLoadResult(
         bbr_data=bbr_data,
         bbr_fit_points=bbr_fit_points,
         bbr_fit_model=bbr_fit_model,
         target_temperature=target_temperature,
-        actual_temperature=actual_temperature
+        actual_temperature=actual_temperature,
+        r2_bbr=r2_bbr
     )
 
 
@@ -154,7 +157,7 @@ def load_csv(uploaded_file):
         
         target_temperature = np.float64(info[2][4])
         
-        bbr_data, bbr_fit_points, bbr_fit_model  = fit_bbr_curve(bbr_data)
+        bbr_data, bbr_fit_points, bbr_fit_model, r2_bbr  = fit_bbr_curve(bbr_data)
         
         
         actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
@@ -173,7 +176,7 @@ def load_csv(uploaded_file):
         bbr_data['Stiffness (MPa)'] = df[3]
         target_temperature = np.float64(dfhead.iloc[6,1])
         
-        bbr_data, bbr_fit_points, bbr_fit_model = fit_bbr_curve(bbr_data)
+        bbr_data, bbr_fit_points, bbr_fit_model, r2_bbr = fit_bbr_curve(bbr_data)
         
         actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
         
@@ -187,7 +190,8 @@ def load_csv(uploaded_file):
                                         bbr_fit_points,
                                         bbr_fit_model,
                                         target_temperature,
-                                        actual_temperature
+                                        actual_temperature,
+                                        r2_bbr
                                     )
 
 
@@ -231,7 +235,7 @@ def load_xlsm(uploaded_file):
         )
     )
     
-    bbr_data, bbr_fit_points, bbr_fit_model = fit_bbr_curve(bbr_data)
+    bbr_data, bbr_fit_points, bbr_fit_model, r2_bbr = fit_bbr_curve(bbr_data)
     
     actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
     
@@ -240,7 +244,8 @@ def load_xlsm(uploaded_file):
                                 bbr_fit_points,
                                 bbr_fit_model,
                                 target_temperature,
-                                actual_temperature
+                                actual_temperature,
+                                r2_bbr
                                 )
 
 
@@ -408,6 +413,12 @@ def fit_bbr_curve(bbr_data):
             bbr_fit_points['log(t)'],
             bbr_fit_points['log(S)'],
             2))
+    
+    rss = np.sum((bbr_fit_points['log(S)'] - bbr_fit_model(bbr_fit_points['log(t)']))**2)
+    tss = np.sum((bbr_fit_points['log(S)'] - np.mean(bbr_fit_points['log(S)']))**2)
+    
+    r2_bbr = 1 - rss/tss
+    
     bbr_data['Sc (MPa)'] = 10**(
     bbr_fit_model(bbr_data['log(t)']))
     bbr_data['Percent diff'] = (
@@ -419,7 +430,7 @@ def fit_bbr_curve(bbr_data):
         * bbr_data['log(t)']
         + bbr_fit_model.coefficients[1])
     bbr_fit_points = bbr_data[bbr_data['Time (s)'].isin(BBR_TIMES)]
-    return bbr_data, bbr_fit_points, bbr_fit_model
+    return bbr_data, bbr_fit_points, bbr_fit_model, r2_bbr
 
 @dataclass
 class TTSResult:
@@ -696,7 +707,7 @@ def compute_ca(
                 dynamic_shear_modulus,
                 glassy_modulus
             ),
-            bounds=[(0.01, 5), (-10, 10)]
+            bounds=[(0.01, 5), (-50, 50)]
         )
     
     if optimize_glassy_modulus:
@@ -1073,7 +1084,7 @@ def add_reference_temperature_label(
     )
 
 
-def create_bbr_fit_plot(bbr_fit_points):
+def create_bbr_fit_plot(bbr_fit_points, r2_bbr):
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
     
     
@@ -1083,6 +1094,11 @@ def create_bbr_fit_plot(bbr_fit_points):
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Stiffness (MPa)')
     
+    fig.text(
+        0.25,
+        0.30,
+        f'$R^2$ = {round(r2_bbr, 6):.6f}'
+    )
     
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -1591,7 +1607,7 @@ def create_fatigue_plot(
 
     ax.set_yscale('log')
 
-    ax.set_ylim(1e1,1e6)
+    ax.set_ylim(1e2,1e6)
 
     ax.set_xlim(0,90)
 
@@ -2634,8 +2650,8 @@ def build_executive_summary(
         }
 
     details = (
-        f"$ΔT_c$: {delta_tc_result['text']}; "
-        f"$G-R$: {g_r_result['text']}; "
+        f"$ΔT_c$: {delta_tc_result['text']};  \n"
+        f"$G-R$: {g_r_result['text']};  \n"
         f"$Pavel-Kriz$: {p_k_result['text']}."
     )
 
@@ -2655,7 +2671,7 @@ with st.bottom:
     st.caption("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/). All rights reserved.")
 
 
-st.logo("icon.png", size="large")
+#st.logo("icon.png", size="large")
 
 
 # Create a sidebar
@@ -2798,7 +2814,7 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 
-st.image("BBRtoDSRv1.jpeg")
+#st.image("BBRtoDSRv1.jpeg")
 
 
 tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation, tab_reporting = st.tabs([
@@ -2866,6 +2882,7 @@ with tab_data:
                 bbr_data = loaded.bbr_data
                 bbr_fit_points = loaded.bbr_fit_points
                 bbr_fit_model = loaded.bbr_fit_model
+                bbr_r2_model = loaded.r2_bbr
             
                 target_temperature = loaded.target_temperature
                 actual_temperature = loaded.actual_temperature
@@ -2881,7 +2898,7 @@ with tab_data:
             
             st.write(f"**Data from {uploaded_file.name}:**")
             st.dataframe(bbr_fit_points, hide_index = True)
-            fig = create_bbr_fit_plot(bbr_fit_points)
+            fig = create_bbr_fit_plot(bbr_fit_points, bbr_r2_model)
             st.pyplot(fig)
             plt.close(fig)
             
@@ -3579,7 +3596,7 @@ if st.session_state.analysis_complete:
                     "GPL RMSE(log)",
                     "β",
                     f"logωC @ $T_{{{'ref'}}}$",
-                    "Rheological Index (R)",
+                    "Rheological Index ($R$)",
                     "CA $R^2$",
                     "CA RMSE(log)"
                 ],
