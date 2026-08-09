@@ -3069,7 +3069,7 @@ if st.session_state.analysis_complete:
         st.stop()
     
     st.toast(
-    "Analysis started. Navigate through the tabs to review the analysis."
+    "Analysis started. Navigate through the tabs to review the analysis.", icon="🛠️"
     )
     
     
