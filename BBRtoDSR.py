@@ -453,6 +453,8 @@ def compute_tts(bbr_temperature_results):
     shift_data = []
     warnings = []
     
+    
+    # Use warmest test temperature as Tref
     reference_temperature = (
     bbr_temperature_results.loc[0, 'Temperature (C)']
     )
@@ -662,7 +664,9 @@ def compute_ca(
     m,
     poissons_ratio,
     glassy_modulus,
-    optimize_glassy_modulus=False
+    optimize_glassy_modulus=False, 
+    beta_initial = 0.15,
+    log_omegaC_initial = -3
               ):
     
     reduced_omega = 2/(np.pi*reduced_time)
@@ -676,8 +680,8 @@ def compute_ca(
     if optimize_glassy_modulus:
 
         initial_data_CA = [
-            0.1,
-            -3,
+            beta_initial,
+            log_omegaC_initial,
             np.log10(glassy_modulus)
         ]
     
@@ -689,15 +693,15 @@ def compute_ca(
                 dynamic_shear_modulus
             ),
             bounds=[
-                (0.01, 5),
-                (-10, 10),
+                (0.01, 1),
+                (-15, 15),
                 (2.3, 4)
             ]
         )
 
     else:
 
-        initial_data_CA = [0.1,-3]
+        initial_data_CA = [beta_initial, log_omegaC_initial]
     
         result_CA = minimize(
             ca_objective,
@@ -707,7 +711,7 @@ def compute_ca(
                 dynamic_shear_modulus,
                 glassy_modulus
             ),
-            bounds=[(0.01, 5), (-50, 50)]
+            bounds=[(0.01, 1), (-15, 15)]
         )
     
     if optimize_glassy_modulus:
@@ -1064,6 +1068,50 @@ def compute_pavel_kriz(
         "temperature": temperature,
         "phase": phase,   
     }
+
+
+def compute_bbr_ri_from_s60(
+    bbr_temperature_results
+):
+
+    S = bbr_temperature_results["S(60)"].to_numpy()
+    m = bbr_temperature_results["m-value(60)"].to_numpy()
+
+    mask = (
+        (S > 0)
+        & (m > 0)
+        & (m < 1)
+    )
+
+    S = S[mask]
+    m = m[mask]
+
+    x = np.log10(1 - m)
+    y = np.log10(S)
+
+    slope, intercept, r_value, _, _ = stats.linregress(x, y)
+
+    lambda_est = 1 / slope
+
+    R_est = np.log10(2) / lambda_est
+
+    Sg_est = 10**intercept
+
+    Sm05_est = 10**(
+        intercept
+        + slope*np.log10(0.5)
+    )
+
+    return {
+        "lambda": lambda_est,
+        "R": R_est,
+        "Sg": Sg_est,
+        "Sm05": Sm05_est,
+        "r2": r_value**2
+    }
+
+
+
 
 # Function to create plots-------------------------------------------------------------------
 
@@ -3116,8 +3164,38 @@ if st.session_state.analysis_complete:
        
         tts = compute_tts(bbr_temperature_results)
         
+        results_bbr_CA = compute_bbr_ri_from_s60(bbr_temperature_results)
+        
         for msg in tts.warnings:
             st.warning(msg)
+        
+        R_from_bbr = results_bbr_CA["R"]
+        Sg_est = results_bbr_CA["Sg"]
+        beta_from_bbr = results_bbr_CA["lambda"]
+        
+        omegaC_estimates = (
+            (
+                (Sg_est / np.array(tts.stiffness_list))**beta_from_bbr
+                - 1
+            )**(1/beta_from_bbr)
+        ) / np.array(tts.reduced_time_list)
+        
+        valid = (
+            np.isfinite(omegaC_estimates)
+            & (omegaC_estimates > 0)
+        )
+        
+        if np.any(valid):
+            log_omegaC_initial = np.median(
+                np.log10(omegaC_estimates[valid])
+            )
+        else:
+            log_omegaC_initial = -3
+            st.warning(
+                "Unable to estimate initial ωC from BBR data. "
+                "Using default value."
+            )
+        
         
         
         a_T_list = tts.a_T_list
@@ -3165,6 +3243,11 @@ if st.session_state.analysis_complete:
     
         master_curve_fig = create_master_curve_plot(master_curve_series, reference_temperature)
         st.pyplot(master_curve_fig)
+        
+        st.write(f"$β$(BBR) = {beta_from_bbr:.3f}")
+        st.write(f"$S_g$(BBR) = {Sg_est:.0f} MPa")
+        st.write(f"$R_{{{'est-BBR'}}}$ = {round(R_from_bbr, 2)}")
+        st.write(f"Initial log$ω_{{{'C-est-BBR'}}}$ = {round(log_omegaC_initial, 3)}")
         
         
     with tab_dsr:
@@ -3225,7 +3308,9 @@ if st.session_state.analysis_complete:
             m,
             poissons_ratio,
             glassy_modulus,
-            optimize_glassy_modulus
+            optimize_glassy_modulus, 
+            beta_from_bbr,
+            log_omegaC_initial
         )
         
         beta = ca["beta"]
