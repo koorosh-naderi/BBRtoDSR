@@ -2,8 +2,6 @@
 """
 Created on Tue Apr 29 16:42:12 2025
 
-@author: NADERIK1
-"""
 #import libraries
 import streamlit as st
 import numpy as np
@@ -1658,18 +1656,28 @@ def create_fatigue_plot(
     ax.set_ylim(1e2,1e6)
 
     ax.set_xlim(0,90)
-
+    
+    
     for x, y, z in zip(
-        phase_fatigue_list,
-        G_fatigue_list,
-        Temperature_fatigue_list
+    phase_fatigue_list,
+    G_fatigue_list,
+    Temperature_fatigue_list
     ):
-        ax.text(
-            x+1,
-            y,
-            f"{z}°C",
-            fontsize=7
-        )
+    
+        x_text = x + 1
+    
+        if (
+            0 <= x_text <= 90
+            and 1e2 <= y <= 1e6
+        ):
+            ax.text(
+                x_text,
+                y,
+                f"{z}°C",
+                fontsize=7,
+                clip_on=True
+            )
+
 
     ax.legend()
 
