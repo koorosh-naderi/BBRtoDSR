@@ -2875,13 +2875,13 @@ st.image("BBRtoDSRv1.jpeg")
 
 
 tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation, tab_reporting = st.tabs([
-    "Data",
-    "LT Properties",
-    "TTS",
-    "DSR Transformation",
-    "IT Performance",
-    "Animation",
-    "Reporting"
+    "🗄️Data",
+    "❄️LT Properties",
+    "⏳TTS",
+    "📈DSR Transformation",
+    "📊IT Performance",
+    "🎞️Animation",
+    "📝Reporting"
 ])
 
 
