@@ -2728,7 +2728,7 @@ with st.bottom:
     st.caption("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/). All rights reserved.")
 
 
-#st.logo("icon.png", size="large")
+st.logo("icon.png", size="large")
 
 
 # Create a sidebar
@@ -2871,7 +2871,7 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 
-#st.image("BBRtoDSRv1.jpeg")
+st.image("BBRtoDSRv1.jpeg")
 
 
 tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation, tab_reporting = st.tabs([
