@@ -1087,6 +1087,12 @@ def compute_bbr_ri_from_s60(
 
     x = np.log10(1 - m)
     y = np.log10(S)
+    
+    if np.sum(mask) < 2:
+        raise ValueError(
+            "Insufficient valid BBR data points "
+            "to estimate rheological index parameters."
+        )
 
     slope, intercept, r_value, _, _ = stats.linregress(x, y)
 
@@ -2353,6 +2359,12 @@ def merge_replicate_temperatures(
                 'm-value(60)': m60
             }
         )
+        
+        
+    if not merged_rows:
+        raise ValueError(
+            "No valid temperatures remained after replicate merging."
+        )
 
     return pd.DataFrame(
         merged_rows
@@ -2464,6 +2476,11 @@ def create_pg_grading_table(
     Creates interpolated table at
     standard PG temperatures.
     """
+    
+    if len(bbr_temperature_results) < 2:
+        raise ValueError(
+            "At least two temperatures are required for PG grading."
+        )
 
     df = (
         bbr_temperature_results
@@ -2522,7 +2539,16 @@ def create_pg_grading_table(
             }
         )
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "Temperature (C)",
+            "S(60)",
+            "m-value(60)",
+            "S",
+            "m"
+        ]
+    )
 
 
 
@@ -3050,6 +3076,52 @@ if st.session_state.analysis_complete:
             )
         )
         
+        #st.write("Merged rows:", len(bbr_temperature_results))
+        #st.write("Columns:", list(bbr_temperature_results.columns))
+        
+        if len(bbr_temperature_results) < 2:
+            
+            remaining_temps = []
+
+            if "Temperature (C)" in bbr_temperature_results.columns:
+                remaining_temps = (
+                    bbr_temperature_results["Temperature (C)"]
+                    .round(2)
+                    .tolist()
+                )
+            
+            st.error(
+                "After merging replicate temperatures, "
+                f"only {len(remaining_temps)} distinct temperature(s) remain: "
+                f"{remaining_temps}. "
+                "At least two distinct temperatures are required."
+            )
+            
+            st.stop()
+            
+            
+        temperature_span = (
+            bbr_temperature_results["Temperature (C)"].max()
+            - bbr_temperature_results["Temperature (C)"].min()
+        )
+        
+        if temperature_span < 1.0:
+        
+            temps = (
+                bbr_temperature_results["Temperature (C)"]
+                .round(2)
+                .tolist()
+            )
+        
+            st.error(
+                "The available temperatures are too close together "
+                f"({temps}). A minimum spread of 1°C is required "
+                "for meaningful analysis."
+            )
+        
+            st.stop()
+        
+        
         pg_table = create_pg_grading_table(
             bbr_temperature_results
         )
@@ -3061,6 +3133,10 @@ if st.session_state.analysis_complete:
         
     except Exception as e:
         
+        import traceback
+
+        st.code(traceback.format_exc())
+
         st.error(str(e))
         st.stop()
     
@@ -3072,22 +3148,7 @@ if st.session_state.analysis_complete:
     
     
     
-    if len(bbr_temperature_results) < 2:
-        
-        remaining_temps = (
-            bbr_temperature_results["Temperature (C)"]
-            .round(2)
-            .tolist()
-        )
-        
-        st.error(
-            "After merging replicate temperatures, "
-            f"only {len(remaining_temps)} distinct temperature(s) remain: "
-            f"{remaining_temps}. "
-            "At least two distinct temperatures are required."
-        )
-        
-        st.stop()
+    
     
     st.toast(
     "Analysis started. Navigate through the tabs to review the analysis.", icon="🛠️"
@@ -3123,50 +3184,40 @@ if st.session_state.analysis_complete:
             bbr_temperature_results['Temperature (C)'].to_numpy()
         )
         
+            
         
-        if len(bbr_temperature_results)<2:
-            
-            st.warning("Upload at least two BBR datasets obtained at different test temperatures.")
-            
-        elif np.ptp(analysis_temps) < 1:
+        low_temp = calculate_low_temperature_properties(
+            bbr_temperature_results
+        )
         
-            st.warning(
-                "The temperature range is narrow. Arrhenius fitting may be less reliable."
-            )
-    
-        else:
-            low_temp = calculate_low_temperature_properties(
-                bbr_temperature_results
-            )
-            
-            T_s = low_temp["Tc_S"]
-            T_m = low_temp["Tc_m"]
-            Delta_Tc = low_temp["Delta_Tc"]
-            
-            low_temp_fig = create_low_temperature_properties_plot(
-                bbr_temperature_results,
-                low_temp
-            )
-            
-            st.pyplot(low_temp_fig)
-            #plt.close(low_temp_fig)
-            
-                        
-            col_tcs, col_tcm, col_deltatc = st.columns(3)
-            
-            with col_tcs:
-                st.metric(f"$T_{{{'c,S'}}}$", f"{T_s:.1f} °C",border=True, icon=":material/thermostat:")
-            with col_tcm:
-                st.metric(f"$T_{{{'c,m'}}}$", f"{T_m:.1f} °C",border=True, icon=":material/thermostat:")
-            with col_deltatc:
-                st.metric(f"$Δ T_{'c'}$", f"{Delta_Tc} °C",border=True, icon=":material/crisis_alert:")
-            
-            delta_tc_result = classify_delta_tc(Delta_Tc)
+        T_s = low_temp["Tc_S"]
+        T_m = low_temp["Tc_m"]
+        Delta_Tc = low_temp["Delta_Tc"]
+        
+        low_temp_fig = create_low_temperature_properties_plot(
+            bbr_temperature_results,
+            low_temp
+        )
+        
+        st.pyplot(low_temp_fig)
+        #plt.close(low_temp_fig)
+        
+                    
+        col_tcs, col_tcm, col_deltatc = st.columns(3)
+        
+        with col_tcs:
+            st.metric(f"$T_{{{'c,S'}}}$", f"{T_s:.1f} °C",border=True, icon=":material/thermostat:")
+        with col_tcm:
+            st.metric(f"$T_{{{'c,m'}}}$", f"{T_m:.1f} °C",border=True, icon=":material/thermostat:")
+        with col_deltatc:
+            st.metric(f"$Δ T_{'c'}$", f"{Delta_Tc} °C",border=True, icon=":material/crisis_alert:")
+        
+        delta_tc_result = classify_delta_tc(Delta_Tc)
 
-            show_assessment(
-                delta_tc_result,
-                col_deltatc
-            )
+        show_assessment(
+            delta_tc_result,
+            col_deltatc
+        )
             
         
         st.markdown("""---""")        
@@ -3634,14 +3685,27 @@ if st.session_state.analysis_complete:
             )
             
             
-            st.table(
-                pg_table,
-                border="horizontal"
-            )
             
-            st.write(
-                f"Low-Temperature PG Grade: {pg_result['pg_grade']}"
-            )
+            if pg_table.empty:
+
+                st.warning(
+                    "Low-temperature PG grade could not be determined."
+                )
+            
+            else:
+            
+                st.table(
+                    pg_table,
+                    border="horizontal"
+                )
+            
+                st.write(
+                    f"Low-Temperature PG Grade: {pg_result['pg_grade']}"
+                )
+            
+            
+            
+            
             
             if pg_result["dt_required"]:
                 st.warning(pg_result["message"])
