@@ -1196,7 +1196,7 @@ def create_arrhenius_plot(
     fig.text(
         0.50,
         0.55,
-        f'$r^2$ = {round(r_squared_Arrhenius, 3)}'
+        f'$R^2$ = {round(r_squared_Arrhenius, 3)}'
     )
 
     handles, labels = ax.get_legend_handles_labels()
