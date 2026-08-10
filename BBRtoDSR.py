@@ -2732,14 +2732,14 @@ st.logo("icon.png", size="large")
 
 
 # Create a sidebar
-st.sidebar.header("⌨ BBRtoDSR")
+st.sidebar.header(":material/keyboard: BBRtoDSR")
 st.sidebar.write("""
     This application reads Bending Beam Rheometer (BBR) test data and estimates dynamic shear rheological properties typically obtained using a Dynamic Shear Rheometer (DSR). 
     By applying a series of rheological models, the software calculates a range of rheological parameters and performance-related indices.
 """)
 
 st.sidebar.markdown("""---""")
-st.sidebar.subheader("⚠ Important Information")
+st.sidebar.subheader(":material/warning: Important Information")
 
 # Description
 st.sidebar.write("""
@@ -2850,7 +2850,7 @@ st.sidebar.markdown("""---""")
 
 
 # Contact Text
-st.sidebar.markdown("✉ Contact Me")
+st.sidebar.markdown(":material/mail: Contact Me")
 st.sidebar.write("For questions, suggestions, or bug reports, please contact: [koorosh.naderi@colas.com](mailto:koorosh.naderi@colas.com)")
 
 st.sidebar.markdown("""
@@ -2875,13 +2875,13 @@ st.image("BBRtoDSRv1.jpeg")
 
 
 tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation, tab_reporting = st.tabs([
-    "🗄️Data",
-    "❄️LT Properties",
-    "⏳TTS",
-    "📈DSR Transformation",
-    "📊IT Performance",
-    "🎞️Animation",
-    "📝Reporting"
+    ":material/database: Data",
+    ":material/snowflake: LT Properties",
+    ":material/hourglass: TTS",
+    ":material/chart_data: DSR Transformation",
+    ":material/bar_chart: IT Performance",
+    ":material/animated_images: Animation",
+    ":material/article: Reporting"
 ])
 
 
@@ -3150,13 +3150,13 @@ if st.session_state.analysis_complete:
         
         st.markdown("""---""")        
         
-        st.write(f"**Please note that $T_{{{'c,S'}}}$ and $T_{{{'c,m'}}}$ are critical temperatures that have been shifted by −10 °C from the test temperature. "
-                 "This adjustment converts the 60 s test condition to an equivalent 7,200 s stiffness, which was the original criterion for resistance to single-event low-temperature cracking.**"
+        st.write(f"➤Please note that **$T_{{{'c,S'}}}$** and **$T_{{{'c,m'}}}$** are critical temperatures that have been shifted by **−10 °C** from the test temperature. "
+                 "This adjustment converts the **60 s** test condition to an equivalent **7,200 s** stiffness, which was the original criterion for resistance to single-event low-temperature cracking."
                  "  \n\n"
-                 f"**Also note that $ΔT_{'c'}$ was introduced to help detect highly aged or waxy bitumen samples. "
-                 "In AASHTO R114, this parameter has been reintroduced to assess the embrittlement of the binder found in Reclaimed Asphalt Shingles. "
-                 f"Additionally, other applications have been proposed to link low $ΔT_{'c'}$ to durability concerns observed in the field (< -5 °C). "
-                 f"In any case, $ΔT_{'c'}$ can be low for polymer-modified binders; a low $ΔT_{'c'}$ for modified binder may not necessarily indicate a high susceptibility to cracking.**")
+                 f"➤Also note that **$ΔT_{'c'}$** was introduced to help detect highly aged or waxy bitumen samples. "
+                 "In **AASHTO R114**, this parameter has been reintroduced to assess the embrittlement of the binder found in Reclaimed Asphalt Shingles. "
+                 f"Additionally, other applications have been proposed to link low **$ΔT_{'c'}$** to durability concerns observed in the field (< -5 °C). "
+                 f"In any case, **$ΔT_{'c'}$** can be low for polymer-modified binders; a low **$ΔT_{'c'}$** for modified binder may not necessarily indicate a high susceptibility to cracking.")
         
         for msg in replicate_messages:
             st.info(msg)
@@ -3244,9 +3244,9 @@ if st.session_state.analysis_complete:
         
         
         st.write(f"**$E_{'a'}$: {round(activation_energy, 3)} kJ/mol**")
-        st.write(f"**R is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$**")
-        st.write("**Please note that temperature is expressed in Kelvin and that 'ln' denotes the natural logarithm.**")
-        st.write(f"**An $r^{2}$ value below 0.98 may indicate inconsistency in the BBR data and should prompt further review of the test results.**")
+        st.write(f"➤**R**, in this equation, is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$")
+        st.write("➤Please note that temperature is expressed in **Kelvin** and that **'ln'** denotes the natural logarithm.")
+        st.write(f"➤An **$R^{2}$** value below **0.98** may indicate inconsistency in the BBR data and should prompt further review of the test results.")
     
         st.markdown("""---""")
     
@@ -3365,13 +3365,13 @@ if st.session_state.analysis_complete:
 
         if optimize_glassy_modulus:
             st.write(
-                f"**The glassy modulus ($G_g$) was optimized as part of the CA model fit and converged to "
-                f"{glassy_modulus_CA/1000:.2f} GPa.**"
+                f"➤The glassy modulus ($G_g$) was optimized as part of the CA model fit and converged to "
+                f"**{glassy_modulus_CA/1000:.2f} GPa**."
             )
         else:
             st.write(
-                f"**The glassy modulus ($G_g$) was fixed at "
-                f"{glassy_modulus_CA/1000:.2f} GPa during the CA model fit.**"
+                f"➤The glassy modulus **($G_g$)** was fixed at "
+                f"**{glassy_modulus_CA/1000:.2f} GPa** during the CA model fit."
             )
     
     
@@ -3410,8 +3410,8 @@ if st.session_state.analysis_complete:
         st.pyplot(gr_fig)
         #plt.close(gr_fig)
 
-        st.write("""**The Glover-Rowe parameter, which is based on the DSR Fn proposed by [Glover et al.](https://rosap.ntl.bts.gov/view/dot/81884), was originally developed to relate dynamic rheological properties in shear mode to tensile failure strain (ductility) in tension mode for pure or unmodified bitumen (asphalt binder). 
-                 For polymer-modified binders, caution is advised, as elevated Glover-Rowe values do not necessarily correspond to reduced ductility or increased cracking susceptibility.**""")
+        st.write("""➤The **Glover-Rowe** (**G-R**) parameter, which is based on the **$DSR$** **$F_n$** proposed by [Glover et al.](https://rosap.ntl.bts.gov/view/dot/81884), was originally developed to relate dynamic rheological properties in shear mode to tensile failure strain (ductility) in tension mode for pure or unmodified bitumen (asphalt binder). 
+                 For polymer-modified binders, caution is advised, as elevated Glover-Rowe values do not necessarily correspond to reduced ductility or increased cracking susceptibility.""")
     
         st.markdown("""---""")
         
