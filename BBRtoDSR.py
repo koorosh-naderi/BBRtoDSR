@@ -1144,7 +1144,7 @@ def create_bbr_fit_plot(bbr_fit_points, r2_bbr):
     fig.text(
         0.25,
         0.30,
-        f'$R^2$ = {round(r2_bbr, 6):.6f}'
+        f'$r^2$ = {round(r2_bbr, 6):.6f}'
     )
     
     ax.set_xscale('log')
@@ -1161,7 +1161,7 @@ def create_arrhenius_plot(
     r_squared_Arrhenius
 ):
 
-    fig, ax = plt.subplots(dpi=DISPLAY_DPI)
+    fig, ax = plt.subplots(dpi=DISPLAY_DPI, figsize=(6,4))
     
 
 
@@ -1187,20 +1187,26 @@ def create_arrhenius_plot(
     ax.set_ylabel('Shift Factor')
     ax.set_yscale('log')
 
-    fig.text(
-        0.50,
-        0.60,
-        'ln$a_T$ = ($E_a$/R)(1/$T$-1/$T_{ref}$)'
+    ax.text(
+        0.55,
+        0.675,
+        'ln$a_T$ = ($E_a$/ℝ)(1/$T$-1/$T_{ref}$)',
+        transform=ax.transAxes,
+        va="top"
     )
 
-    fig.text(
-        0.50,
+    ax.text(
         0.55,
-        f'$R^2$ = {round(r_squared_Arrhenius, 3)}'
+        0.60,
+        f'$r^2$ = {round(r_squared_Arrhenius, 3)}',
+        transform=ax.transAxes,
+        va="top"
     )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels)
+    ax.legend(handles, labels, 
+              loc="best", fontsize=8)
+    
 
     return fig
 
@@ -1317,7 +1323,7 @@ def create_low_temperature_properties_plot(
 def create_master_curve_plot(master_curve_series,
                              reference_temperature):
 
-    fig, ax = plt.subplots(dpi=DISPLAY_DPI)
+    fig, ax = plt.subplots(dpi=DISPLAY_DPI, figsize=(6,4))
 
     for curve in master_curve_series:
 
@@ -1340,7 +1346,8 @@ def create_master_curve_plot(master_curve_series,
     ax.set_yscale('log')
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels)
+    ax.legend(handles, labels, 
+              loc="best", fontsize=8)
 
     return fig
 
@@ -1355,7 +1362,7 @@ def create_gpl_plot(
     reference_temperature
 ):
 
-    fig, ax = plt.subplots(dpi=DISPLAY_DPI)
+    fig, ax = plt.subplots(dpi=DISPLAY_DPI, figsize=(6,4))
 
     ax.plot(
         reduced_time_list,
@@ -1383,25 +1390,32 @@ def create_gpl_plot(
     ax.set_xscale('log')
     ax.set_yscale('log')
 
-    fig.text(
-        0.20,
-        0.60,
-        '$D$($t$) = $D_{0}$ + $D_{1}$.$t^m$'
+    ax.text(
+        0.10,
+        0.85,
+        '$D$($t$) = $D_{0}$ + $D_{1}$.$t^m$',
+        transform=ax.transAxes,
+        va="top"
     )
-    fig.text(
-    0.20,
-    0.55,
-    f'$R^2$ = {r2_gpl:.4f}'
+    ax.text(
+    0.10,
+    0.775,
+    f'$r^2$ = {r2_gpl:.4f}',
+    transform=ax.transAxes,
+    va="top"
     )
 
-    fig.text(
-    0.20,
-    0.50,
-    f'RMSE(log) = {rmse_log:.4f}'
+    ax.text(
+    0.10,
+    0.70,
+    f'RMSE(log) = {rmse_log:.4f}',
+    transform=ax.transAxes,
+    va="top"
     )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels)
+    ax.legend(handles, labels, 
+              loc="best", fontsize=8)
 
     return fig
 
@@ -1415,7 +1429,7 @@ def create_ca_plot(
     reference_temperature
 ):
 
-    fig, ax = plt.subplots(dpi=DISPLAY_DPI)
+    fig, ax = plt.subplots(dpi=DISPLAY_DPI, figsize=(6,4))
 
     ax.plot(
         reduced_omega,
@@ -1444,26 +1458,33 @@ def create_ca_plot(
     ax.set_xscale('log')
     ax.set_yscale('log')
 
-    fig.text(
-        0.20,
-        0.65,
-        '|G*| = $G_{g}$[1+($ω_{C}$/ω)$^{β}$]$^{(-1/β)}$'
+    ax.text(
+        0.10,
+        0.85,
+        '|G*| = $G_{g}$[1+($ω_{C}$/ω)$^{β}$]$^{(-1/β)}$',
+        transform=ax.transAxes,
+        va="top"
     )
     
-    fig.text(
-    0.20,
-    0.60,
-    f'$R^2$ = {r2_ca:.4f}'
+    ax.text(
+    0.10,
+    0.775,
+    f'$r^2$ = {r2_ca:.4f}',
+    transform=ax.transAxes,
+    va="top"
     )
 
-    fig.text(
-    0.20,
-    0.55,
-    f'RMSE(log) = {rmse_ca:.4f}'
+    ax.text(
+    0.10,
+    0.70,
+    f'RMSE(log) = {rmse_ca:.4f}',
+    transform=ax.transAxes,
+    va="top"
     )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels)
+    ax.legend(handles, labels, 
+              loc="best", fontsize=8)
 
     return fig
 
@@ -2728,7 +2749,7 @@ with st.bottom:
     st.caption("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/). All rights reserved.")
 
 
-st.logo("icon.png", size="large")
+#st.logo("icon.png", size="large")
 
 
 # Create a sidebar
@@ -2796,7 +2817,7 @@ poissons_ratio = st.sidebar.slider(
     value=0.50,      # Default value
     step=0.05,       # Step value for the slider
     format="%.2f",   # Format the displayed value
-    help="Adjust the Poisson's ratio between 0.25 and 0.5"  # Optional help text
+    help="Adjust Poisson's ratio between 0.25 and 0.5"  # Optional help text
 )
 
 optimize_glassy_modulus = st.sidebar.checkbox(
@@ -2871,7 +2892,7 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 
-st.image("BBRtoDSRv1.jpeg")
+#st.image("BBRtoDSRv1.jpeg")
 
 
 tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation, tab_reporting = st.tabs([
@@ -3105,7 +3126,7 @@ if st.session_state.analysis_complete:
         
         if len(bbr_temperature_results)<2:
             
-            st.warning("Upload at least two BBR datasets obtained at distinct test temperatures.")
+            st.warning("Upload at least two BBR datasets obtained at different test temperatures.")
             
         elif np.ptp(analysis_temps) < 1:
         
@@ -3169,7 +3190,7 @@ if st.session_state.analysis_complete:
         
         st.subheader("**Arrhenius Model**")
         
-        st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {reference_temperature} °C**")           
+        st.write(f"**Reference Temperature, $T_{{{'ref'}}}$: {round(reference_temperature, 2)} °C**")           
        
         tts = compute_tts(bbr_temperature_results)
         
@@ -3244,9 +3265,9 @@ if st.session_state.analysis_complete:
         
         
         st.write(f"**$E_{'a'}$: {round(activation_energy, 3)} kJ/mol**")
-        st.write(f"➤**R**, in this equation, is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$")
-        st.write("➤Please note that temperature is expressed in **Kelvin** and that **'ln'** denotes the natural logarithm.")
-        st.write(f"➤An **$R^{2}$** value below **0.98** may indicate inconsistency in the BBR data and should prompt further review of the test results.")
+        st.write(f"➤**ℝ**, in this equation, is the universal gas constant which is equal to 8.31446261815324 $J$⋅$K^{{{'−1'}}}$⋅$mol^{{{'−1'}}}$")
+        st.write("➤Note that temperature is expressed in **Kelvin** and that **'ln'** denotes the natural logarithm.")
+        st.write(f"➤An **$r^{2}$** value below **0.98** may indicate inconsistency in the BBR data and should prompt further review of the test results.")
     
         st.markdown("""---""")
     
@@ -3682,16 +3703,16 @@ if st.session_state.analysis_complete:
             tts_summary = pd.DataFrame({
                 "Item": [
                     "Activation Energy $E_a$",
-                    "Arrhenius $R^2$",
+                    "Arrhenius $r^2$",
                     "GPL m",
                     "logD₀",
                     "logD₁",
-                    "GPL $R^2$",
+                    "GPL $r^2$",
                     "GPL RMSE(log)",
                     "β",
                     f"logωC @ $T_{{{'ref'}}}$",
                     "Rheological Index ($R$)",
-                    "CA $R^2$",
+                    "CA $r^2$",
                     "CA RMSE(log)"
                 ],
                 "Value": [
@@ -3707,6 +3728,8 @@ if st.session_state.analysis_complete:
                 tts_summary,
                 border="horizontal"
             )
+            
+            st.divider()
             
             fig_tt_left, fig_tt_right = st.columns(2)
 
@@ -3756,6 +3779,8 @@ if st.session_state.analysis_complete:
                 g_r_classify_result,
                 prefix="Assessment based on G-R parameter: "
             )
+            
+            
             
             st.pyplot(gr_fig)
             
