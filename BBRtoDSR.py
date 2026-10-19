@@ -3057,7 +3057,7 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 
-#st.image("BBRtoDSRv1.jpeg")
+st.image("BBRtoDSRv1.jpeg")
 
 
 tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation, tab_reporting = st.tabs([
