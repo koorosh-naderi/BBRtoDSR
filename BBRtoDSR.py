@@ -2914,7 +2914,7 @@ with st.bottom:
     st.caption("© 2025 [Koorosh Naderi](https://www.linkedin.com/in/koorosh-naderi/). All rights reserved.")
 
 
-#st.logo("icon.png", size="large")
+st.logo("icon.png", size="large")
 
 
 # Create a sidebar
