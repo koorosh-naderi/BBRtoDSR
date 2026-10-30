@@ -120,7 +120,6 @@ def create_load_result(
         r2_bbr=r2_bbr
     )
 
-
 def load_csv(uploaded_file):
     uploaded_file.seek(0)
     num_lines = count_lines(uploaded_file)
@@ -1255,8 +1254,6 @@ def compute_bbr_ri_from_s60(
         "Sm05": Sm05_est,
         "r2": r_value**2
     }
-
-
 
 
 # Function to create plots-------------------------------------------------------------------
@@ -3037,7 +3034,7 @@ st.sidebar.markdown("""---""")
 
 # Contact Text
 st.sidebar.markdown(":material/mail: Contact Me")
-st.sidebar.write("For questions, suggestions, or bug reports, please contact my [LinkedIn Page](https://www.linkedin.com/in/koorosh-naderi/?lipi=urn%3Ali%3Apage%3Ad_flagship3_feed%3BFRdxeDKGTiu2bvHpyhYGQw%3D%3D)")
+st.sidebar.write("For questions, suggestions, or bug reports, please contact my [LinkedIn Page](https://www.linkedin.com/in/koorosh-naderi/)")
 
 st.sidebar.markdown("""
 <style>
