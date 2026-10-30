@@ -4,22 +4,6 @@ Created on Wed Jul 29 01:48:28 2026
 @author: NADERIK1
 """
 #import libraries
-import streamlit as st
-
-import numpy as np
-import pandas as pd
-
-import matplotlib
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-from matplotlib import animation
-from matplotlib.animation import FFMpegWriter
-
-from scipy import stats
-from scipy.optimize import minimize, root_scalar
-
-from statistics import linear_regression
 
 import math
 import os
@@ -27,6 +11,23 @@ import tempfile
 
 from dataclasses import dataclass
 from datetime import datetime
+
+from statistics import linear_regression
+
+import numpy as np
+import pandas as pd
+
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib import animation
+from matplotlib.animation import FFMpegWriter
+
+from scipy import stats
+from scipy.optimize import minimize, root_scalar
+
+import streamlit as st
+
+matplotlib.use("Agg")
 
 
 #magic numbers
@@ -91,11 +92,11 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 #-----------------------------------------------------------------
 
 @dataclass
 class BBRLoadResult:
+
     bbr_data: pd.DataFrame
     bbr_fit_points: pd.DataFrame
     bbr_fit_model: np.poly1d
@@ -152,7 +153,7 @@ def load_csv(uploaded_file):
         )
         target_temperature = np.float64(info[2][4])
         bbr_data, bbr_fit_points, bbr_fit_model, r2_bbr  = fit_bbr_curve(bbr_data)
-        actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()   
+        actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
     elif num_lines==44:
         df = pd.read_csv(uploaded_file,
                          header=None,
@@ -162,7 +163,7 @@ def load_csv(uploaded_file):
         uploaded_file.seek(0)
         dfhead = pd.read_csv(uploaded_file,
                              header=None,
-                             engine='python', 
+                             engine='python',
                              encoding='unicode_escape',
                              nrows=36,
                              index_col=False)
@@ -195,28 +196,32 @@ def load_xlsm(uploaded_file):
     sheet_name = 'BBR Results'
     start_row = 100
 
-    df = pd.read_excel(uploaded_file, sheet_name=sheet_name, engine="openpyxl", skiprows=start_row-1,header=None)
+    df = pd.read_excel(uploaded_file,
+                       sheet_name=sheet_name,
+                       engine="openpyxl",
+                       skiprows=start_row-1,
+                       header=None)
+
     full_sheet = pd.read_excel(uploaded_file, sheet_name=sheet_name, engine="openpyxl", header=None)
-        
+
     bbr_data = pd.DataFrame()
     bbr_data['Time (s)'] = df[0]
     bbr_data['Force (mN)'] = df[1]*1000
     bbr_data['Deflection (mm)'] = df[2]
     bbr_data['Temperature (C)'] = df[3]
-    
+
     beam_span = np.float64(full_sheet.iloc[29,2])/1000
     beam_width = np.float64(full_sheet.iloc[19,8])/1000
     beam_thickness = np.float64(full_sheet.iloc[20,8])/1000
     target_temperature = np.float64(full_sheet.iloc[28,2])
-    
-    
+
     force = np.float64(bbr_data['Force (mN)'])
     deflection = np.float64(bbr_data['Deflection (mm)'])
-    
+
     bbr_data['Stiffness (MPa)'] = np.nan
 
     mask = deflection > 0
-    
+
     bbr_data.loc[mask, 'Stiffness (MPa)'] = (
         1e-6
         * force[mask]
@@ -228,11 +233,11 @@ def load_xlsm(uploaded_file):
             * beam_thickness**3
         )
     )
-    
+
     bbr_data, bbr_fit_points, bbr_fit_model, r2_bbr = fit_bbr_curve(bbr_data)
-    
+
     actual_temperature = np.float64(bbr_fit_points['Temperature (C)']).mean()
-    
+
     return create_load_result(
                                 bbr_data,
                                 bbr_fit_points,
@@ -241,7 +246,6 @@ def load_xlsm(uploaded_file):
                                 actual_temperature,
                                 r2_bbr
                                 )
-
 
 def load_bbr_file(uploaded_file):
 
@@ -262,7 +266,7 @@ def load_bbr_file(uploaded_file):
 #-----------------------------------------------------------------
 def find_bracketing_rows(df, column_name, target_value):
     # Sort the DataFrame by the specified column
-    df_sorted = df.sort_values(by=column_name)  
+    df_sorted = df.sort_values(by=column_name)
     # Initialize variables for bracketing
     lower_row = None
     upper_row = None
@@ -281,7 +285,7 @@ def find_bracketing_rows(df, column_name, target_value):
         # If no bracketing rows found, find the two closest rows
         df_sorted['distance'] = abs(df_sorted[column_name] - target_value)
         closest_rows = df_sorted.nsmallest(2, 'distance')
-        closest_rows = closest_rows.drop(columns='distance')  # Drop the distance column if you don't want it
+        closest_rows = closest_rows.drop(columns='distance')
         return closest_rows
 
 
@@ -337,41 +341,33 @@ def celsius_to_kelvin(temp_c):
 def fit_bbr_curve(bbr_data):
     bbr_data = bbr_data.copy()
     bbr_data['Time (s)'] = pd.to_numeric(bbr_data['Time (s)'], errors='coerce')
-    
-    
+
     time_values = np.float64(bbr_data['Time (s)'])
     stiffness_values = np.float64(
         bbr_data['Stiffness (MPa)']
     )
-    
+
     bbr_data['log(t)'] = np.nan
 
     time_mask = time_values > 0
-    
+
     bbr_data.loc[time_mask, 'log(t)'] = np.log10(
         time_values[time_mask]
     )
-    
+
     bbr_data['log(S)'] = np.nan
 
     stiffness_mask = stiffness_values > 0
-    
+
     bbr_data.loc[stiffness_mask, 'log(S)'] = np.log10(
         stiffness_values[stiffness_mask]
     )
-    
-    
-    
-    #bbr_data['log(t)'] = np.log10(
-    #    np.float64(bbr_data['Time (s)']))
-    #bbr_data['log(S)'] = np.log10(
-    #    bbr_data['Stiffness (MPa)'])
-    
+
     bbr_fit_points = bbr_data[
     bbr_data['Time (s)'].isin(
             BBR_TIMES)]
-    
-    
+
+
     bbr_fit_points = (
         bbr_fit_points
         .replace(
@@ -385,8 +381,7 @@ def fit_bbr_curve(bbr_data):
             ]
         )
     )
-    
-    #expected_points = len(BBR_TIMES)
+
     actual_points = len(bbr_fit_points)
 
     if actual_points < 3:
@@ -394,29 +389,21 @@ def fit_bbr_curve(bbr_data):
             f"Only {actual_points} valid BBR points were found. "
             "At least 3 points are required for a quadratic fit."
         )
-        
-    #fit_warning = None
 
-    #if actual_points < expected_points:
-    #    fit_warning = (
-    #        f"Only {actual_points} of {expected_points} expected "
-    #        "BBR time points were available."
-    #    )
-    
     bbr_fit_model = np.poly1d(
         np.polyfit(
             bbr_fit_points['log(t)'],
             bbr_fit_points['log(S)'],
             2))
-    
+
     rss = np.sum((bbr_fit_points['log(S)'] - bbr_fit_model(bbr_fit_points['log(t)']))**2)
     tss = np.sum((bbr_fit_points['log(S)'] - np.mean(bbr_fit_points['log(S)']))**2)
-    
+
     if np.isclose(tss, 0):
         r2_bbr = np.nan
     else:
         r2_bbr = 1 - rss/tss
-    
+
     bbr_data['Sc (MPa)'] = 10**(
     bbr_fit_model(bbr_data['log(t)']))
     bbr_data['Percent diff'] = (
@@ -450,8 +437,7 @@ def compute_tts(bbr_temperature_results):
     master_curve_series = []
     shift_data = []
     warnings = []
-    
-    
+
     # Use warmest test temperature as Tref
     reference_temperature = (
     bbr_temperature_results.loc[0, 'Temperature (C)']
@@ -477,21 +463,24 @@ def compute_tts(bbr_temperature_results):
         ).iloc[0,:]
     })
 
-    
+
     for i in range(1,len(bbr_temperature_results)):
         fixed_T1 = bbr_temperature_results.loc[i-1, 'Temperature (C)']
         fixed_T2 = bbr_temperature_results.loc[i, 'Temperature (C)']
-        
+
         current_temperature = (
                                 bbr_temperature_results.loc[i, 'Temperature (C)']
                                 )
-        
-        initial_x = [np.log10(7200/60)*(1/celsius_to_kelvin(fixed_T2)-1/celsius_to_kelvin(fixed_T1))/(
-            1/(-10+celsius_to_kelvin(fixed_T1))-1/(celsius_to_kelvin(fixed_T1)))]
+
+        initial_x = [np.log10(7200/60) *
+                     (1/celsius_to_kelvin(fixed_T2)-1/celsius_to_kelvin(fixed_T1)) /
+                     (1/(-10+celsius_to_kelvin(fixed_T1))-1/(celsius_to_kelvin(fixed_T1)))
+                     ]
+
         result = minimize(shift_factor_objective,
                           initial_x,
                           args=(fixed_T1, fixed_T2, bbr_temperature_results), bounds=[(-10, 10)])
-        
+
         if not result.success:
             raise ValueError(
                 f"Shift factor optimization failed between "
@@ -500,7 +489,7 @@ def compute_tts(bbr_temperature_results):
                 f"{result.message}"
             )
 
-        
+
         if result.fun > 0.05:
             warnings.append(
                 f"Poor overlap between "
@@ -508,23 +497,23 @@ def compute_tts(bbr_temperature_results):
                 f"{fixed_T2:.1f}°C "
                 f"(RMSE(logS)={result.fun:.3f})"
             )
-        
-        
+
         a_T_list.append(result.x[0])
         temperatures.append(current_temperature)
-        
+
         cumulative_shift = np.cumsum(a_T_list)[i-1]
-        
+
         reduced_time_list.extend(BBR_TIMES/(10**cumulative_shift))
-        stiffness_list.extend(calculate_stiffness_curve(current_temperature, bbr_temperature_results).iloc[0,:])
-        
+        stiffness_list.extend(calculate_stiffness_curve(
+            current_temperature,
+            bbr_temperature_results).iloc[0,:])
+
         shift_data.append({
             "temperature": current_temperature,
             "shift_factor": result.x[0],
             "cumulative_shift": cumulative_shift
         })
-        
-        
+
         master_curve_series.append({
             "temperature": current_temperature,
             "time": BBR_TIMES/(10**cumulative_shift),
@@ -533,13 +522,16 @@ def compute_tts(bbr_temperature_results):
                 bbr_temperature_results
             ).iloc[0,:]
         })
+
     inverse_temperature_difference = np.array([1/celsius_to_kelvin(x)-1/celsius_to_kelvin(temperatures[0]) for x in temperatures])
     logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
-    
-    arrhenius_slope, _ = linear_regression(inverse_temperature_difference, logaT_arr, proportional=True)
+
+    arrhenius_slope, _ = linear_regression(inverse_temperature_difference,
+                                           logaT_arr,
+                                           proportional=True)
 
     predicted_logaT_arr = [arrhenius_slope * xi for xi in inverse_temperature_difference]
-    
+
     rss = sum((yi - y_pred) ** 2 for yi, y_pred in zip(logaT_arr, predicted_logaT_arr))
     mean_y = sum(logaT_arr) / len(logaT_arr)
     tss = sum((yi - mean_y) ** 2 for yi in logaT_arr)
@@ -547,8 +539,7 @@ def compute_tts(bbr_temperature_results):
         r_squared_Arrhenius = np.nan
     else:
         r_squared_Arrhenius = 1 - rss/tss
-    #r_squared_Arrhenius = 1 - rss / tss
-    
+
     shift_factor_values = 10**logaT_arr
     arrhenius_values = 10**(arrhenius_slope * inverse_temperature_difference)
 
@@ -566,7 +557,6 @@ def compute_tts(bbr_temperature_results):
     warnings=warnings
                     )
 
-   
 
 def compute_gpl(
     reduced_time_list,
@@ -594,9 +584,8 @@ def compute_gpl(
             (None, None),
             (None, None)
             ]
-        
     )
-            
+
     if not result_gpl.success:
         raise ValueError(
             f"GPL optimization failed: "
@@ -608,7 +597,7 @@ def compute_gpl(
         np.log10(reduced_time).max(),
         50
     )
-    
+
     predicted_creep_compliance = (
     10**result_gpl.x[1]
     + 10**result_gpl.x[2]
@@ -619,14 +608,14 @@ def compute_gpl(
         + 10**result_gpl.x[2]
         * newtime**result_gpl.x[0]
     )
-    
+
     rss = np.sum(
     (
         np.log10(creep_compliance)
         - np.log10(predicted_creep_compliance)
     )**2
     )
-    
+
     tss = np.sum(
         (
             np.log10(creep_compliance)
@@ -635,14 +624,11 @@ def compute_gpl(
             )
         )**2
     )
-    
+
     if np.isclose(tss, 0):
         r2_gpl = np.nan
     else:
         r2_gpl = 1 - rss/tss
-    
-    
-    #r2_gpl = 1 - rss / tss
     rmse_log = np.sqrt(
     np.mean(
         (
@@ -651,7 +637,6 @@ def compute_gpl(
         )**2
     )
     )
-    
 
     return {
         "m": result_gpl.x[0],
@@ -668,7 +653,6 @@ def compute_gpl(
         "r2": r2_gpl,
         "rmse_log": rmse_log,
         "objective_value": result_gpl.fun
-        
     }
 
 def compute_ca(
@@ -678,18 +662,18 @@ def compute_ca(
     m,
     poissons_ratio,
     glassy_modulus,
-    optimize_glassy_modulus=False, 
+    optimize_glassy_modulus=False,
     beta_initial = 0.15,
     log_omegaC_initial = -3
               ):
-    
+
     reduced_omega = 2/(np.pi*reduced_time)
     storage_compliance = (10**logD0) + (10**logD1) * math.gamma(1+m) * (reduced_omega)**(-m) * np.cos(m * np.pi/2)
     loss_compliance = (10**logD1) * math.gamma(1+m) * (reduced_omega)**(-m) * np.sin(m * np.pi/2)
     dynamic_compliance = (storage_compliance**2 + loss_compliance**2)**0.5
     dynamic_modulus = 1/dynamic_compliance
     dynamic_shear_modulus = dynamic_modulus/(2*(1+poissons_ratio))
-    
+
 
     if optimize_glassy_modulus:
 
@@ -698,7 +682,7 @@ def compute_ca(
             log_omegaC_initial,
             np.log10(glassy_modulus)
         ]
-    
+
         result_CA = minimize(
             ca_objective_opt,
             initial_data_CA,
@@ -712,18 +696,17 @@ def compute_ca(
                 (2.3, 4)
             ]
         )
-        
+
         if not result_CA.success:
             raise ValueError(
                 f"CA optimization failed: "
                 f"{result_CA.message}"
             )
 
-
     else:
 
         initial_data_CA = [beta_initial, log_omegaC_initial]
-    
+
         result_CA = minimize(
             ca_objective,
             initial_data_CA,
@@ -734,13 +717,13 @@ def compute_ca(
             ),
             bounds=[(0.01, 1), (-15, 15)]
         )
-        
+
         if not result_CA.success:
             raise ValueError(
                 f"CA optimization failed: "
                 f"{result_CA.message}"
             )
-    
+
     if optimize_glassy_modulus:
         beta = result_CA.x[0]
         logOmegaC = result_CA.x[1]
@@ -750,13 +733,12 @@ def compute_ca(
         beta = result_CA.x[0]
         logOmegaC = result_CA.x[1]
         fitted_Gg = glassy_modulus
-    
-    
-    
-    newomega = 10**np.linspace(np.log10(reduced_omega).min(),np.log10(reduced_omega).max(),50)
+
+    newomega = 10**np.linspace(np.log10(reduced_omega).min(),
+                               np.log10(reduced_omega).max(),50)
     newG_CA = fitted_Gg*(1+(10**logOmegaC/newomega)**beta)**(-1/beta)
     newphase_CA = 90/(1+(newomega/(10**logOmegaC))**beta)
-    
+
     predicted_dynamic_shear_modulus = (
     fitted_Gg
     * (
@@ -765,7 +747,7 @@ def compute_ca(
         **beta
     )**(-1/beta)
     )
-    
+
     rss = np.sum(
     (
         np.log10(dynamic_shear_modulus)
@@ -773,7 +755,7 @@ def compute_ca(
         np.log10(predicted_dynamic_shear_modulus)
     )**2
     )
-    
+
     tss = np.sum(
     (
         np.log10(dynamic_shear_modulus)
@@ -783,15 +765,12 @@ def compute_ca(
         )
     )**2
     )
-    
+
     if np.isclose(tss, 0):
         r2_ca = np.nan
     else:
         r2_ca = 1 - rss/tss
-    
-    
-    #r2_ca = 1 - rss/tss
-    
+
     rmse_ca = np.sqrt(
     np.mean(
         (
@@ -801,8 +780,7 @@ def compute_ca(
         )**2
     )
     )
-      
-    
+
     return {
     "beta": result_CA.x[0],
     "logOmegaC": result_CA.x[1],
@@ -828,7 +806,7 @@ def compute_gr(
     logOmegaC,
     glassy_modulus
 ):
-    
+
     omega_gr = 0.005
 
     omega_gr_reduced = (
@@ -908,13 +886,13 @@ def compute_fatigue(
         ),
         method="brentq"
     )
-    
+
     if not result_T_fatigue.converged:
         raise ValueError(
             f"Fatigue 5000 kPa optimization failed: "
             f"{result_T_fatigue.message}"
         )
-    
+
     if not result_T_fatigue_6000.converged:
         raise ValueError(
             f"Fatigue 6000 kPa optimization failed: "
@@ -1012,7 +990,7 @@ def compute_fatigue(
             )
         )
     )
-    
+
     fatigue_table = pd.DataFrame(
     columns=[
         'Temperature (°C)',
@@ -1022,7 +1000,7 @@ def compute_fatigue(
         'G"=|G*|sinδ (kPa)'
     ]
     )
-    
+
     fatigue_table['Temperature (°C)'] = Temperature_fatigue_list
     
     fatigue_table['Phase Angle (°)'] = np.round(
@@ -1910,7 +1888,6 @@ def create_pavel_kriz_plot(
     return fig
 
 
-
 def create_master_curve_animation_figure(
                             temperatures,
                             movingtime,
@@ -2750,23 +2727,22 @@ def show_assessment(
     container=st,
     prefix=""
     ):
+    message_functions = {
+        "success": container.success,
+        "warning": container.warning,
+        "error": container.error,
+        "info": container.info
+    }
     
-        message_functions = {
-            "success": container.success,
-            "warning": container.warning,
-            "error": container.error,
-            "info": container.info
-        }
+    text = (
+        f"{prefix}{result['symbol']} "
+        f"{result['text']}"
+    )
     
-        text = (
-            f"{prefix}{result['symbol']} "
-            f"{result['text']}"
-        )
-    
-        message_functions.get(
-            result["level"],
-            container.info
-        )(text)
+    message_functions.get(
+        result["level"],
+        container.info
+    )(text)
 
 
 
