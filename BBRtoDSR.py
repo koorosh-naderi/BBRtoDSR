@@ -523,7 +523,10 @@ def compute_tts(bbr_temperature_results):
             ).iloc[0,:]
         })
 
-    inverse_temperature_difference = np.array([1/celsius_to_kelvin(x)-1/celsius_to_kelvin(temperatures[0]) for x in temperatures])
+    inverse_temperature_difference = np.array([
+        1/celsius_to_kelvin(
+            x)-1/celsius_to_kelvin(
+                temperatures[0]) for x in temperatures])
     logaT_arr = np.insert(np.cumsum(a_T_list),0,0,axis=0)
 
     arrhenius_slope, _ = linear_regression(inverse_temperature_difference,
@@ -668,7 +671,10 @@ def compute_ca(
               ):
 
     reduced_omega = 2/(np.pi*reduced_time)
-    storage_compliance = (10**logD0) + (10**logD1) * math.gamma(1+m) * (reduced_omega)**(-m) * np.cos(m * np.pi/2)
+    storage_compliance = (10**logD0) + (
+        10**logD1) * math.gamma(
+            1+m) * (reduced_omega)**(-m) * np.cos(
+                m * np.pi/2)
     loss_compliance = (10**logD1) * math.gamma(1+m) * (reduced_omega)**(-m) * np.sin(m * np.pi/2)
     dynamic_compliance = (storage_compliance**2 + loss_compliance**2)**0.5
     dynamic_modulus = 1/dynamic_compliance
@@ -1002,22 +1008,22 @@ def compute_fatigue(
     )
 
     fatigue_table['Temperature (°C)'] = Temperature_fatigue_list
-    
+
     fatigue_table['Phase Angle (°)'] = np.round(
         phase_fatigue_list,
         1
     )
-    
+
     fatigue_table['|G*| (kPa)'] = np.round(
         G_fatigue_list,
         0
     )
-    
+
     fatigue_table["G'=|G*|cosδ (kPa)"] = np.round(
         G_storage_fatigue_list,
         0
     )
-    
+
     fatigue_table['G"=|G*|sinδ (kPa)'] = np.round(
         G_loss_fatigue_list,
         0
@@ -1147,7 +1153,7 @@ def compute_pavel_kriz(
         ),
         method="brentq"
     )
-    
+
     if not result_T_pavel_kriz.converged:
         raise ValueError(
             f"Pavel-Kriz optimization failed: "
@@ -1205,7 +1211,7 @@ def compute_bbr_ri_from_s60(
 
     x = np.log10(1 - m)
     y = np.log10(S)
-    
+
     if np.sum(mask) < 2:
         raise ValueError(
             "Insufficient valid BBR data points "
@@ -1255,24 +1261,34 @@ def add_reference_temperature_label(
 
 def create_bbr_fit_plot(bbr_fit_points, r2_bbr):
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
-    
-    
-    ax.plot(bbr_fit_points['Time (s)'], bbr_fit_points['Sc (MPa)'],label='Estimated', linestyle='-', c='#634B71')
-    ax.plot(bbr_fit_points['Time (s)'], bbr_fit_points['Stiffness (MPa)'],label='Measured', linestyle=':', marker='o', c='#EE7402', alpha=0.5)
+
+
+    ax.plot(bbr_fit_points['Time (s)'],
+            bbr_fit_points['Sc (MPa)'],
+            label='Estimated',
+            linestyle='-',
+            c='#634B71')
+    ax.plot(bbr_fit_points['Time (s)'],
+            bbr_fit_points['Stiffness (MPa)'],
+            label='Measured',
+            linestyle=':',
+            marker='o',
+            c='#EE7402',
+            alpha=0.5)
     ax.set_title('Plot of Stiffness vs Time')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Stiffness (MPa)')
-    
+
     fig.text(
         0.25,
         0.30,
         f'$r^2$ = {round(r2_bbr, 6):.6f}'
     )
-    
+
     ax.set_xscale('log')
     ax.set_yscale('log')
     handles, labels = ax.get_legend_handles_labels()
-    
+
     ax.legend(handles, labels)
     return fig
 
@@ -1284,8 +1300,6 @@ def create_arrhenius_plot(
 ):
 
     fig, ax = plt.subplots(dpi=DISPLAY_DPI, figsize=(6,4))
-    
-
 
     ax.plot(
         np.array(temperature_list),
@@ -1326,9 +1340,9 @@ def create_arrhenius_plot(
     )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, 
+    ax.legend(handles, labels,
               loc="best", fontsize=8)
-    
+
 
     return fig
 
@@ -1416,23 +1430,23 @@ def create_low_temperature_properties_plot(
     fig.suptitle(
         f'$ΔT_c$ = {low_temp["Delta_Tc"]:.1f} °C'
     )
-    
-    
+
+
     temp_min = int(
     6 * np.floor(
         bbr_temperature_results['Temperature (C)'].min() / 6
     )
         )
-    
+
     temp_max = int(
         6 * np.ceil(
             bbr_temperature_results['Temperature (C)'].max() / 6
         )
     ) + 6
-    
-    
+
+
     ticks = np.arange(temp_min, temp_max, 3)
-    
+
     ax1.set_xticks(ticks)
     ax2.set_xticks(ticks)
 
@@ -1459,7 +1473,7 @@ def create_master_curve_plot(master_curve_series,
             marker='o'
         )
 
-    
+
     ax.set_title('Stiffness Master Curve')
     add_reference_temperature_label(ax, reference_temperature)
     ax.set_xlabel('Time (s)')
@@ -1468,7 +1482,7 @@ def create_master_curve_plot(master_curve_series,
     ax.set_yscale('log')
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, 
+    ax.legend(handles, labels,
               loc="best", fontsize=8)
 
     return fig
@@ -1502,7 +1516,7 @@ def create_gpl_plot(
         marker='None',
         c='#EE7402'
     )
-    
+
     ax.set_title('Creep Compliance Master Curve')
     add_reference_temperature_label(ax, reference_temperature)
 
@@ -1536,7 +1550,7 @@ def create_gpl_plot(
     )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, 
+    ax.legend(handles, labels,
               loc="best", fontsize=8)
 
     return fig
@@ -1570,7 +1584,7 @@ def create_ca_plot(
         c='#EE7402'
     )
 
-    
+
     ax.set_title('Complex Modulus Master Curve')
     add_reference_temperature_label(ax, reference_temperature)
 
@@ -1587,7 +1601,7 @@ def create_ca_plot(
         transform=ax.transAxes,
         va="top"
     )
-    
+
     ax.text(
     0.10,
     0.775,
@@ -1605,7 +1619,7 @@ def create_ca_plot(
     )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, 
+    ax.legend(handles, labels,
               loc="best", fontsize=8)
 
     return fig
@@ -1616,7 +1630,7 @@ def create_glover_rowe_plot(
     g_gr,
     show_RI_contours=True
 ):
-    
+
     fig, ax = plt.subplots(dpi=DISPLAY_DPI)
 
     # RI lines
@@ -1633,7 +1647,7 @@ def create_glover_rowe_plot(
                     ((10**x)/1)**(np.log10(2)/i)
                 )
             )
-    
+
             g_x = (
                 1e6
                 * (
@@ -1641,7 +1655,7 @@ def create_glover_rowe_plot(
                     (1/10**x)**(np.log10(2)/i)
                 )**(i/-np.log10(2))
             )
-    
+
             ax.plot(
                 phase_x,
                 g_x,
@@ -1650,36 +1664,36 @@ def create_glover_rowe_plot(
                 alpha=0.3,
                 zorder=1
             )
-    
+
             target_phase = 40 + 2*(i + 0.25)
-    
+
             idx = np.argmin(
                 np.abs(
                     phase_x - target_phase
                 )
             )
-    
+
             dy = (
                 np.log10(g_x[idx+1])
                 -
                 np.log10(g_x[idx-1])
             )
-    
+
             dx = (
                 phase_x[idx+1]
                 -
                 phase_x[idx-1]
             )
-    
+
             ANGLE_CORRECTION = 7
-    
+
             angle = (
                 ANGLE_CORRECTION
                 * np.degrees(
                     np.arctan(dy/dx)
                 )
             )
-    
+
             ax.text(
                 phase_x[idx],
                 g_x[idx],
@@ -1787,7 +1801,7 @@ def create_fatigue_plot(
         label='|G*|sinδ = 6000 kPa',
         linestyle='-.',
         c='#A3186D',
-        
+
     )
 
     ax.set_title('Black Diagram')
@@ -1800,16 +1814,16 @@ def create_fatigue_plot(
     ax.set_ylim(1e2,1e6)
 
     ax.set_xlim(0,90)
-    
-    
+
+
     for x, y, z in zip(
     phase_fatigue_list,
     G_fatigue_list,
     Temperature_fatigue_list
     ):
-    
+
         x_text = x + 1
-    
+
         if (
             0 <= x_text <= 90
             and 1e2 <= y <= 1e6
@@ -1898,7 +1912,7 @@ def create_master_curve_animation_figure(
                            ):
 
     fig, ax = plt.subplots(dpi=200)
-    
+
     fig.subplots_adjust(bottom=0.22)
 
     ax.set_yscale('log')
@@ -1918,12 +1932,12 @@ def create_master_curve_animation_figure(
     ax.set_title(
         'Plot of Stiffness Master Curve vs Reduced Time'
     )
-    
+
     add_reference_temperature_label(ax, reference_temperature)
 
     ax.set_xlabel('Log Time (s)')
     ax.set_ylabel('Stiffness (MPa)')
-    
+
     ax.set_xlim(round(movingtime.min()-movingshifts.max(),0)-1, round(movingtime.max(),0)+1)
     ax.set_ylim(
     10**(round(np.log10(ymin),0)-1),
@@ -1978,7 +1992,7 @@ def create_master_curve_animation(
         frames=150,
         interval=5,
         blit=True,
-        
+
     )
 
 def render_animation_to_video(
@@ -2006,7 +2020,7 @@ def render_animation_to_video(
         writer=writer,
         dpi=dpi
     )
-    
+
     plt.close(fig)
 
     with open(fname, "rb") as f:
@@ -2124,7 +2138,7 @@ def gpl_objective(
     creep_comp_calc = (
         10**logD0
         + 10**logD1 * reduced_time**m)
-    
+
     if np.any(creep_comp_calc <= 0):
         return np.inf
 
@@ -2132,7 +2146,7 @@ def gpl_objective(
         np.log10(creep_compliance)
         - np.log10(creep_comp_calc)
     )
-    
+
     return np.sqrt(
         np.mean(
             residuals**2
@@ -2152,7 +2166,7 @@ def ca_objective(
             1
             + (10**logOmegaC/reduced_omega)**beta
         )**(-1/beta))
-    
+
     if np.any(G_calc_CA <= 0):
         return np.inf
 
@@ -2160,7 +2174,7 @@ def ca_objective(
         np.log10(G_calc_CA)
         - np.log10(dynamic_shear_modulus)
     )
-    
+
     return np.sqrt(
         np.mean(
             residuals**2
@@ -2172,9 +2186,9 @@ def ca_objective_opt(
     reduced_omega,
     dynamic_shear_modulus
 ):
-    
+
     beta, logOmegaC, logGg = params
-    
+
     Gg = 10**logGg
 
     G_calc_CA = (
@@ -2184,7 +2198,7 @@ def ca_objective_opt(
             (10**logOmegaC / reduced_omega)**beta
         )**(-1/beta)
     )
-    
+
     if np.any(G_calc_CA <= 0):
         return np.inf
 
@@ -2193,7 +2207,7 @@ def ca_objective_opt(
         -
         np.log10(dynamic_shear_modulus)
     )
-    
+
     return np.sqrt(
         np.mean(
             residuals**2
@@ -2245,7 +2259,7 @@ def evaluate_replicate_repeatability(
 
     for idx, row in bbr_temperature_results.iterrows():
 
-        if used[idx]: 
+        if used[idx]:
             continue
 
         temp = row["Temperature (C)"]
@@ -2269,22 +2283,22 @@ def evaluate_replicate_repeatability(
 
         s_spread = np.max(s_values) - np.min(s_values)
         m_spread = np.max(m_values) - np.min(m_values)
-        
+
         s_mean = np.mean(s_values)
         m_mean = np.mean(m_values)
-        
+
         if np.isclose(s_mean, 0):
             s_relative_diff = np.nan
             s_pass = False
-            
+
         else:
             s_relative_diff = (s_spread/s_mean) * 100
             s_pass = s_relative_diff <= s_limit
-            
+
         if np.isclose(m_mean, 0):
             m_relative_diff = np.nan
             m_pass = False
-            
+
         else:
             m_relative_diff = (m_spread/m_mean) * 100
             m_pass = m_relative_diff <= m_limit
@@ -2293,25 +2307,25 @@ def evaluate_replicate_repeatability(
             {
                 "Temperature (C)": temp,
                 "Replicates": len(group),
-                
+
                 "S_relative_diff (%)": round(s_relative_diff, 2),
                 "S_pass": s_pass,
-                
+
                 "m_relative_diff (%)": round(m_relative_diff, 2),
                 "m_pass": m_pass,
-                
+
                 "S_spread": s_spread,
                 "m_spread": m_spread,
-                
+
                 "S_mean": s_mean,
                 "m_mean": m_mean,
-                                
+
                 "S_std": np.std(s_values, ddof=1)
                 if len(s_values) > 1 else 0,
 
                 "m_std": np.std(m_values, ddof=1)
                 if len(m_values) > 1 else 0,
-                
+
             }
         )
 
@@ -2324,7 +2338,7 @@ def merge_replicate_temperatures(
     bbr_curve_results,
     tolerance=REPLICATE_TEMPERATURE_TOLERANCE
 ):
-    
+
     messages = []
     sorted_curves = sorted(
         bbr_curve_results,
@@ -2404,15 +2418,15 @@ def merge_replicate_temperatures(
         combined = []
 
         for item in group:
-        
+
             df = item["fit_points"][
                 ["Time (s)", "Stiffness (MPa)"]
             ].copy()
-        
+
             combined.append(df)
-        
+
         all_points = pd.concat(combined)
-        
+
         messages.append(
             f"{len(group)} replicate tests near "
             f"{representative_temperature:.2f} °C "
@@ -2426,14 +2440,14 @@ def merge_replicate_temperatures(
                         .mean()
                         .reset_index()
                         )
-        
+
         if len(mean_curve) < 3:
             raise ValueError(
                 f"Insufficient data points after averaging "
                 f"replicates near "
                 f"{representative_temperature:.2f} °C."
             )
-        
+
         poly = np.poly1d(
             np.polyfit(
                 np.log10(mean_curve["Time (s)"]),
@@ -2442,7 +2456,7 @@ def merge_replicate_temperatures(
             )
         )
 
-        
+
 
         s60 = 10**(
             poly(
@@ -2472,8 +2486,8 @@ def merge_replicate_temperatures(
                 'm-value(60)': m60
             }
         )
-        
-        
+
+
     if not merged_rows:
         raise ValueError(
             "No valid temperatures remained after replicate merging."
@@ -2589,7 +2603,7 @@ def create_pg_grading_table(
     Creates interpolated table at
     standard PG temperatures.
     """
-    
+
     if len(bbr_temperature_results) < 2:
         raise ValueError(
             "At least two temperatures are required for PG grading."
@@ -2733,12 +2747,12 @@ def show_assessment(
         "error": container.error,
         "info": container.info
     }
-    
+
     text = (
         f"{prefix}{result['symbol']} "
         f"{result['text']}"
     )
-    
+
     message_functions.get(
         result["level"],
         container.info
@@ -3046,45 +3060,42 @@ tab_data, tab_lowtemp, tab_tts, tab_dsr, tab_performance, tab_animation, tab_rep
 
 with tab_data:
 
-    st.write("""Data from at least two distinct BBR test temperatures are required for analysis. 
+    st.write("""Data from at least two distinct BBR test temperatures are required for analysis.
              Currently, CSV files generated by Cannon® Instrument Company software are supported (BBRw versions 1.34 and 1.35 have been tested). 
              XLSM files generated by PaveTest® Universal Test Module v2.3.0.5 have also been tested successfully.""")
-    
+
     # Session state to track uploaded files
     if 'uploaded_files' not in st.session_state:
         st.session_state.uploaded_files = []
-        
+
     if 'uploader_key' not in st.session_state:
         st.session_state.uploader_key = 0
-        
+
     if "analysis_complete" not in st.session_state:
         st.session_state.analysis_complete = False
-    
-    
-    
-    
-    
+
+
     # File uploader
-    uploaded_files = st.file_uploader("Choose files (CSV or XLSM)", 
-                                      accept_multiple_files=True, 
+    uploaded_files = st.file_uploader("Choose files (CSV or XLSM)",
+                                      accept_multiple_files=True,
                                       type=['csv', 'xlsm'],
                                       key=f"uploader_{st.session_state.uploader_key}"
                                       )
-    
+
     # If new files are uploaded, clear previous analysis
     if uploaded_files != st.session_state.uploaded_files:
         st.session_state.uploaded_files = uploaded_files
         st.session_state.analysis_complete = False
-    
+
     # Button to clear analysis
     if st.button("Clear loaded results"):
         st.session_state.uploaded_files = []
         st.session_state.uploader_key += 1
         st.session_state.analysis_complete = False
         st.rerun()
-    
+
     bbr_temperature_results = pd.DataFrame(columns=['Temperature (C)','A','B','C','S(60)','m-value(60)'])
-    
+
     bbr_curve_results = []
     
     # Perform analysis if there are uploaded files
